@@ -114,8 +114,8 @@ fn monitor(remote: Option<String>) -> Result<()> {
                             .info(|info| {
                                 dbg!(info);
                             })
-                            .param(|seq, id, index, next| {
-                                dbg!((seq, id, index, next));
+                            .param(|seq, id, index, next, param| {
+                                dbg!((seq, id, index, next, param));
                             })
                             .register();
 
@@ -128,8 +128,8 @@ fn monitor(remote: Option<String>) -> Result<()> {
                             .info(|info| {
                                 dbg!(info);
                             })
-                            .param(|seq, id, index, next| {
-                                dbg!((seq, id, index, next));
+                            .param(|seq, id, index, next, param| {
+                                dbg!((seq, id, index, next, param));
                             })
                             .register();
 

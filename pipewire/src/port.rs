@@ -19,6 +19,62 @@ pub struct Port {
     proxy: Proxy,
 }
 
+impl Port {
+    // TODO: add non-local version when we'll bind pw_thread_loop_start()
+    #[must_use]
+    pub fn add_listener_local(&self) -> PortListenerLocalBuilder {
+        PortListenerLocalBuilder {
+            port: self,
+            cbs: ListenerLocalCallbacks::default(),
+        }
+    }
+
+    /// Subscribe to parameter changes
+    ///
+    /// Automatically emit `param` events for the given ids when they are changed
+    // FIXME: Return result?
+    pub fn subscribe_params(&self, ids: &[spa::param::ParamType]) {
+        unsafe {
+            spa_interface_call_method!(
+                self.proxy.as_ptr(),
+                pw_sys::pw_port_methods,
+                subscribe_params,
+                ids.as_ptr() as *mut _,
+                ids.len().try_into().unwrap()
+            );
+        }
+    }
+
+    /// Enumerate node parameters
+    ///
+    /// Start enumeration of node parameters. For each param, a
+    /// param event will be emitted.
+    ///
+    /// # Parameters
+    /// `seq`: a sequence number to place in the reply \
+    /// `id`: the parameter id to enum, or [`None`] to allow any id \
+    /// `start`: the start index or 0 for the first param \
+    /// `num`: the maximum number of params to retrieve ([`u32::MAX`] may be used to retrieve all params)
+    // FIXME: Add filter parameter
+    // FIXME: Return result?
+    pub fn enum_params(&self, seq: i32, id: Option<spa::param::ParamType>, start: u32, num: u32) {
+        let id = id.map(|id| id.as_raw()).unwrap_or(crate::constants::ID_ANY);
+
+        unsafe {
+            spa_interface_call_method!(
+                self.proxy.as_ptr(),
+                pw_sys::pw_node_methods,
+                enum_params,
+                seq,
+                id,
+                start,
+                num,
+                std::ptr::null()
+            );
+        }
+    }
+}
+
 impl ProxyT for Port {
     fn type_() -> ObjectType {
         ObjectType::Port
@@ -40,23 +96,12 @@ impl ProxyT for Port {
     }
 }
 
-impl Port {
-    // TODO: add non-local version when we'll bind pw_thread_loop_start()
-    #[must_use]
-    pub fn add_listener_local(&self) -> PortListenerLocalBuilder {
-        PortListenerLocalBuilder {
-            port: self,
-            cbs: ListenerLocalCallbacks::default(),
-        }
-    }
-}
-
 #[derive(Default)]
 struct ListenerLocalCallbacks {
     #[allow(clippy::type_complexity)]
     info: Option<Box<dyn Fn(&PortInfo)>>,
     #[allow(clippy::type_complexity)]
-    param: Option<Box<dyn Fn(i32, u32, u32, u32)>>, // TODO: add params
+    param: Option<Box<dyn Fn(i32, spa::param::ParamType, u32, u32, &[u8])>>,
 }
 
 pub struct PortListenerLocalBuilder<'a> {
@@ -95,7 +140,22 @@ impl PortInfo {
     pub fn props(&self) -> Option<&ForeignDict> {
         self.props.as_ref()
     }
-    // TODO: params
+
+    /// Get the param infos for the port.
+    pub fn params(&self) -> &[spa::param::ParamInfo] {
+        unsafe {
+            let params = self.ptr.as_ref().params;
+
+            if params.is_null() {
+                &[]
+            } else {
+                std::slice::from_raw_parts(
+                    params as *const _,
+                    self.ptr.as_ref().n_params.try_into().unwrap(),
+                )
+            }
+        }
+    }
 }
 
 bitflags! {
@@ -113,6 +173,7 @@ impl fmt::Debug for PortInfo {
             .field("direction", &self.direction())
             .field("change-mask", &self.change_mask())
             .field("props", &self.props())
+            .field("params", &self.params())
             .finish()
     }
 }
@@ -147,7 +208,7 @@ impl<'a> PortListenerLocalBuilder<'a> {
     #[must_use]
     pub fn param<F>(mut self, param: F) -> Self
     where
-        F: Fn(i32, u32, u32, u32) + 'static,
+        F: Fn(i32, spa::param::ParamType, u32, u32, &[u8]) + 'static,
     {
         self.cbs.param = Some(Box::new(param));
         self
@@ -171,10 +232,22 @@ impl<'a> PortListenerLocalBuilder<'a> {
             id: u32,
             index: u32,
             next: u32,
-            _param: *const spa_sys::spa_pod,
+            param: *const spa_sys::spa_pod,
         ) {
             let callbacks = (data as *mut ListenerLocalCallbacks).as_ref().unwrap();
-            callbacks.param.as_ref().unwrap()(seq, id, index, next);
+
+            let id = spa::param::ParamType::from_raw(id);
+            let param_slice = if !param.is_null() {
+                std::slice::from_raw_parts(
+                    param as *const u8,
+                    (*param).size as usize + 2 * std::mem::size_of::<u32>(),
+                )
+            } else {
+                &[]
+            };
+
+            // FIXME: Is the lifetime of the param slice unbounded? We need to make sure it can only stay alive for the duration of this function call.
+            callbacks.param.as_ref().unwrap()(seq, id, index, next, param_slice);
         }
 
         let e = unsafe {
