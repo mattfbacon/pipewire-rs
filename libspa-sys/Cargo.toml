@@ -2,7 +2,7 @@
 name = "libspa-sys"
 version = "0.6.0"
 authors = ["Guillaume Desmottes <guillaume.desmottes@collabora.com>"]
-edition = "2018"
+edition = "2021"
 links = "libspa-0.2"
 categories = ["api-bindings", "multimedia"]
 description = "Rust FFI bindings for libspa"
