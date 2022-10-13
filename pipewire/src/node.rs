@@ -11,7 +11,7 @@ use crate::{
     proxy::{Listener, Proxy, ProxyT},
     types::ObjectType,
 };
-use spa::{pod::Pod, spa_interface_call_method, utils::dict::ForeignDict};
+use spa::{pod::Pod, spa_interface_call_method};
 
 #[derive(Debug)]
 pub struct Node {
@@ -123,7 +123,6 @@ pub struct NodeListenerLocalBuilder<'a> {
 
 pub struct NodeInfo {
     ptr: ptr::NonNull<pw_sys::pw_node_info>,
-    props: Option<ForeignDict>,
 }
 
 impl NodeInfo {
@@ -132,10 +131,7 @@ impl NodeInfo {
     /// # Safety
     /// `ptr` must point to a valid, well aligned `pw_sys::pw_node_info`.
     fn from_raw(ptr: ptr::NonNull<pw_sys::pw_node_info>) -> Self {
-        let props_ptr = unsafe { ptr.as_ref().props };
-        let props = ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ForeignDict::from_ptr(ptr) });
-
-        Self { ptr, props }
+        Self { ptr }
     }
 
     pub fn id(&self) -> u32 {
@@ -181,8 +177,10 @@ impl NodeInfo {
         }
     }
 
-    pub fn props(&self) -> Option<&ForeignDict> {
-        self.props.as_ref()
+    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
+        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
+
+        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
     }
 
     /// Get the param infos for the node.

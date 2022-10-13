@@ -1,12 +1,11 @@
-use spa::prelude::*;
-use std::{ffi::CString, fmt, mem::ManuallyDrop, ptr};
+use std::{ffi::CString, fmt, mem::ManuallyDrop, ops::Deref, ptr};
 
 /// A collection of key/value pairs.
 ///
 /// # Examples
 /// Create a `Properties` struct and access the stored values by key:
 /// ```rust
-/// use pipewire::{prelude::*, properties::{properties, Properties}};
+/// use pipewire::{properties::{properties, Properties}};
 ///
 /// let props = properties!{
 ///     "Key" => "Value",
@@ -53,7 +52,7 @@ macro_rules! __properties__ {
     {$($k:expr => $v:expr),+ $(,)?} => {{
         let mut properties = $crate::properties::Properties::new();
         $(
-            <$crate::properties::Properties as $crate::spa::utils::dict::WritableDict>::insert(&mut properties, $k, $v);
+            properties.insert($k, $v);
         )*
         properties
     }};
@@ -98,8 +97,8 @@ impl Properties {
     /// Create a new `Properties` from a given dictionary.
     ///
     /// All the keys and values from `dict` are copied.
-    pub fn from_dict<D: ReadableDict>(dict: &D) -> Self {
-        let ptr = dict.get_dict_ptr();
+    pub fn from_dict(dict: &spa::utils::dict::DictRef) -> Self {
+        let ptr = dict.as_raw();
         unsafe {
             let copy = pw_sys::pw_properties_new_dict(ptr);
             Self::from_ptr(ptr::NonNull::new(copy).expect("pw_properties_new_dict() returned NULL"))
@@ -107,26 +106,29 @@ impl Properties {
     }
 }
 
-impl ReadableDict for Properties {
-    fn get_dict_ptr(&self) -> *const spa_sys::spa_dict {
-        self.as_raw_ptr().cast()
+impl AsRef<PropertiesRef> for Properties {
+    fn as_ref(&self) -> &PropertiesRef {
+        self.deref()
     }
 }
 
-impl WritableDict for Properties {
-    fn insert<K: Into<Vec<u8>>, V: Into<Vec<u8>>>(&mut self, key: K, value: V) {
-        let k = CString::new(key).unwrap();
-        let v = CString::new(value).unwrap();
-        unsafe { pw_sys::pw_properties_set(self.as_raw_ptr(), k.as_ptr(), v.as_ptr()) };
+impl AsRef<spa::utils::dict::DictRef> for Properties {
+    fn as_ref(&self) -> &spa::utils::dict::DictRef {
+        self.deref().as_ref()
     }
+}
 
-    fn remove<K: Into<Vec<u8>>>(&mut self, key: K) {
-        let key = CString::new(key).unwrap();
-        unsafe { pw_sys::pw_properties_set(self.as_raw_ptr(), key.as_ptr(), std::ptr::null()) };
+impl std::ops::Deref for Properties {
+    type Target = PropertiesRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.cast().as_ref() }
     }
+}
 
-    fn clear(&mut self) {
-        unsafe { pw_sys::pw_properties_clear(self.as_raw_ptr()) }
+impl std::ops::DerefMut for Properties {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.ptr.cast().as_mut() }
     }
 }
 
@@ -147,20 +149,6 @@ impl Clone for Properties {
     }
 }
 
-impl std::ops::Deref for Properties {
-    type Target = PropertiesRef;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { self.ptr.cast().as_ref() }
-    }
-}
-
-impl std::ops::DerefMut for Properties {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.ptr.cast().as_mut() }
-    }
-}
-
 impl Drop for Properties {
     fn drop(&mut self) {
         unsafe { pw_sys::pw_properties_free(self.ptr.as_ptr()) }
@@ -169,7 +157,9 @@ impl Drop for Properties {
 
 impl fmt::Debug for Properties {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.debug("Properties", f)
+        let dict: &spa::utils::dict::DictRef = self.as_ref();
+        // FIXME: Debug-print dict keys and values directly
+        f.debug_tuple("Properties").field(dict).finish()
     }
 }
 
@@ -191,40 +181,67 @@ impl PropertiesRef {
         std::ptr::addr_of!(self.0).cast_mut()
     }
 
+    pub fn dict(&self) -> &spa::utils::dict::DictRef {
+        unsafe { &*(&self.0.dict as *const spa_sys::spa_dict as *const spa::utils::dict::DictRef) }
+    }
+
+    // TODO: Impl as trait?
     pub fn to_owned(&self) -> Properties {
         unsafe {
             let ptr = pw_sys::pw_properties_copy(self.as_raw_ptr());
             Properties::from_ptr(ptr::NonNull::new_unchecked(ptr))
         }
     }
-}
 
-impl ReadableDict for PropertiesRef {
-    fn get_dict_ptr(&self) -> *const spa_sys::spa_dict {
-        self.as_raw_ptr().cast()
+    pub fn get(&self, key: &str) -> Option<&str> {
+        let key = CString::new(key).expect("key contains null byte");
+
+        let res =
+            unsafe { pw_sys::pw_properties_get(self.as_raw_ptr().cast_const(), key.as_ptr()) };
+
+        let res = if !res.is_null() {
+            unsafe { Some(std::ffi::CStr::from_ptr(res)) }
+        } else {
+            None
+        };
+
+        // FIXME: Don't return `None` if result is non-utf8
+        res.and_then(|res| res.to_str().ok())
     }
-}
 
-impl WritableDict for PropertiesRef {
-    fn insert<K: Into<Vec<u8>>, V: Into<Vec<u8>>>(&mut self, key: K, value: V) {
+    pub fn insert<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<Vec<u8>>,
+        V: Into<Vec<u8>>,
+    {
         let k = CString::new(key).unwrap();
         let v = CString::new(value).unwrap();
         unsafe { pw_sys::pw_properties_set(self.as_raw_ptr(), k.as_ptr(), v.as_ptr()) };
     }
 
-    fn remove<K: Into<Vec<u8>>>(&mut self, key: K) {
+    pub fn remove<T>(&mut self, key: T)
+    where
+        T: Into<Vec<u8>>,
+    {
         let key = CString::new(key).unwrap();
         unsafe { pw_sys::pw_properties_set(self.as_raw_ptr(), key.as_ptr(), std::ptr::null()) };
     }
 
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         unsafe { pw_sys::pw_properties_clear(self.as_raw_ptr()) }
+    }
+}
+
+impl AsRef<spa::utils::dict::DictRef> for PropertiesRef {
+    fn as_ref(&self) -> &spa::utils::dict::DictRef {
+        self.dict()
     }
 }
 
 impl fmt::Debug for PropertiesRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.debug("PropertiesRef", f)
+        // FIXME: Debug-print dict key and values directly
+        f.debug_tuple("PropertiesRef").field(self.as_ref()).finish()
     }
 }
 
@@ -238,7 +255,7 @@ mod tests {
             "K0" => "V0"
         };
 
-        let mut iter = props.iter();
+        let mut iter = props.dict().iter();
         assert_eq!(("K0", "V0"), iter.next().unwrap());
         assert_eq!(None, iter.next());
     }
@@ -249,9 +266,9 @@ mod tests {
             "K0" => "V0"
         };
 
-        assert_eq!(Some("V0"), props.get("K0"));
+        assert_eq!(Some("V0"), props.dict().get("K0"));
         props.remove("K0");
-        assert_eq!(None, props.get("K0"));
+        assert_eq!(None, props.dict().get("K0"));
     }
 
     #[test]
@@ -260,9 +277,9 @@ mod tests {
             "K0" => "V0"
         };
 
-        assert_eq!(None, props.get("K1"));
+        assert_eq!(None, props.dict().get("K1"));
         props.insert("K1", "V1");
-        assert_eq!(Some("V1"), props.get("K1"));
+        assert_eq!(Some("V1"), props.dict().get("K1"));
     }
 
     #[test]
@@ -276,8 +293,8 @@ mod tests {
 
         // Now, props2 should contain ("K1", "V1"), but props1 should not.
 
-        assert_eq!(None, props1.get("K1"));
-        assert_eq!(Some("V1"), props2.get("K1"));
+        assert_eq!(None, props1.dict().get("K1"));
+        assert_eq!(Some("V1"), props2.dict().get("K1"));
     }
 
     #[test]
@@ -290,11 +307,28 @@ mod tests {
             Properties::from_dict(&dict)
         };
 
-        assert_eq!(props.len(), 1);
-        assert_eq!(props.get("K0"), Some("V0"));
+        assert_eq!(props.dict().len(), 1);
+        assert_eq!(props.dict().get("K0"), Some("V0"));
 
         props.insert("K1", "V1");
-        assert_eq!(props.len(), 2);
-        assert_eq!(props.get("K1"), Some("V1"));
+        assert_eq!(props.dict().len(), 2);
+        assert_eq!(props.dict().get("K1"), Some("V1"));
+    }
+
+    #[test]
+    fn properties_ref() {
+        let props = properties! {
+            "K0" => "V0"
+        };
+        println!("{:?}", &props);
+        let props_ref: &PropertiesRef = props.deref();
+
+        assert_eq!(props_ref.dict().len(), 1);
+        assert_eq!(props_ref.dict().get("K0"), Some("V0"));
+        dbg!(&props_ref);
+
+        let props_copy = props_ref.to_owned();
+        assert_eq!(props_copy.dict().len(), 1);
+        assert_eq!(props_copy.dict().get("K0"), Some("V0"));
     }
 }

@@ -6,33 +6,44 @@
 use bitflags::bitflags;
 // re-exported as used in the static_dict! macro implementation
 pub use spa_sys::spa_dict_item;
-use std::{ffi::CStr, fmt, marker::PhantomData, ptr};
+use std::{convert::TryInto, ffi::CStr, fmt, marker::PhantomData, ptr};
 
-/// Trait providing API to read dictionaries.
-pub trait ReadableDict {
-    /// Obtain the pointer to the raw `spa_dict` struct.
-    fn get_dict_ptr(&self) -> *const spa_sys::spa_dict;
+#[repr(transparent)]
+pub struct DictRef(spa_sys::spa_dict);
 
-    /// An iterator over all raw key-value pairs.
-    /// The iterator element type is `(&CStr, &CStr)`.
-    fn iter_cstr(&self) -> CIter {
-        let first_elem_ptr = unsafe { (*self.get_dict_ptr()).items };
-        let end = if first_elem_ptr.is_null() {
-            ptr::null()
+impl DictRef {
+    /// Returns a reference to the raw [`spa_sys::spa_dict`] this struct represents.
+    pub fn as_raw(&self) -> &spa_sys::spa_dict {
+        &self.0
+    }
+
+    /// Returns the pointer to the raw [`spa_sys::spa_dict`] this struct represents.
+    ///
+    /// # Safety
+    /// The returned pointer must not be used after the [`DictRef`] reference this method is called on becomes invalid.
+    pub fn as_raw_ptr(&self) -> *mut spa_sys::spa_dict {
+        self.as_raw() as *const _ as *mut _
+    }
+
+    /// An iterator over all key-value pairs as `(&CStr, &CStr)` tuples.
+    ///
+    /// Use [`iter`](Self::iter) to iterate over all valid utf-8 pairs as (&str, &str) tuples instead.
+    pub fn iter_cstr(&self) -> CIter {
+        let items = if self.0.items.is_null() {
+            &[]
         } else {
-            unsafe { first_elem_ptr.offset((*self.get_dict_ptr()).n_items as isize) }
+            unsafe { std::slice::from_raw_parts(self.0.items, self.len()) }
         };
 
         CIter {
-            next: first_elem_ptr,
-            end,
+            items,
             _phantom: PhantomData,
         }
     }
 
     /// An iterator over all key-value pairs that are valid utf-8.
     /// The iterator element type is `(&str, &str)`.
-    fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter {
         Iter {
             inner: self.iter_cstr(),
         }
@@ -40,7 +51,7 @@ pub trait ReadableDict {
 
     /// An iterator over all keys that are valid utf-8.
     /// The iterator element type is &str.
-    fn keys(&self) -> Keys {
+    pub fn keys(&self) -> Keys {
         Keys {
             inner: self.iter_cstr(),
         }
@@ -48,7 +59,7 @@ pub trait ReadableDict {
 
     /// An iterator over all values that are valid utf-8.
     /// The iterator element type is &str.
-    fn values(&self) -> Values {
+    pub fn values(&self) -> Values {
         Values {
             inner: self.iter_cstr(),
         }
@@ -56,18 +67,18 @@ pub trait ReadableDict {
 
     /// Returns the number of key-value-pairs in the dict.
     /// This is the number of all pairs, not only pairs that are valid-utf8.
-    fn len(&self) -> usize {
-        unsafe { (*self.get_dict_ptr()).n_items as usize }
+    pub fn len(&self) -> usize {
+        self.0.n_items.try_into().unwrap()
     }
 
     /// Returns `true` if the dict is empty, `false` if it is not.
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Returns the bitflags that are set for the dict.
-    fn flags(&self) -> Flags {
-        Flags::from_bits_retain(unsafe { (*self.get_dict_ptr()).flags })
+    pub fn flags(&self) -> Flags {
+        Flags::from_bits_retain(self.0.flags)
     }
 
     /// Get the value associated with the provided key.
@@ -76,7 +87,7 @@ pub trait ReadableDict {
     /// Use [`iter_cstr`] if you need a non-utf8 key or value.
     ///
     /// [`iter_cstr`]: #method.iter_cstr
-    fn get(&self, key: &str) -> Option<&str> {
+    pub fn get(&self, key: &str) -> Option<&str> {
         self.iter().find(|(k, _)| *k == key).map(|(_, v)| v)
     }
 
@@ -109,7 +120,7 @@ pub trait ReadableDict {
     /// let ptr = DICT.parse::<*const i32>("pointer").unwrap().unwrap();
     /// assert!(!ptr.is_null());
     /// ```
-    fn parse<T: ParsableValue>(&self, key: &str) -> Option<Result<T, ParseValueError>> {
+    pub fn parse<T: ParsableValue>(&self, key: &str) -> Option<Result<T, ParseValueError>> {
         self.iter()
             .find(|(k, _)| *k == key)
             .map(|(_, v)| match T::parse_value(v) {
@@ -120,10 +131,16 @@ pub trait ReadableDict {
                 }),
             })
     }
+}
 
-    #[doc(hidden)]
-    /// [`Debug`] implementation, should not be used directly by users.
-    fn debug(&self, name: &str, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl AsRef<Self> for DictRef {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl std::fmt::Debug for DictRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         struct Entries<'a>(CIter<'a>);
 
         impl<'a> fmt::Debug for Entries<'a> {
@@ -134,14 +151,14 @@ pub trait ReadableDict {
             }
         }
 
-        f.debug_struct(name)
+        f.debug_struct("DictRef")
             .field("flags", &self.flags())
             .field("entries", &Entries(self.iter_cstr()))
             .finish()
     }
 }
 
-/// An error raised by [`ReadableDict::parse`] if the value cannot be converted to the requested type.
+/// An error raised by [`DictRef::parse`] if the value cannot be converted to the requested type.
 #[derive(Debug, Eq, PartialEq)]
 pub struct ParseValueError {
     value: String,
@@ -156,7 +173,7 @@ impl fmt::Display for ParseValueError {
     }
 }
 
-/// Trait implemented on types which can be returned by [`ReadableDict::parse`].
+/// Trait implemented on types which can be returned by [`DictRef::parse`].
 pub trait ParsableValue: Copy {
     /// Try parsing `value` to convert it to the requested type.
     fn parse_value(value: &str) -> Option<Self>;
@@ -216,50 +233,6 @@ impl<T> ParsableValue for *const T {
     }
 }
 
-/// Trait providing API to modify dictionaries.
-pub trait WritableDict {
-    /// Insert the key-value pair, overwriting any old value.
-    fn insert<K: Into<Vec<u8>>, V: Into<Vec<u8>>>(&mut self, key: K, value: V);
-
-    /// Remove the key-value pair if it exists.
-    fn remove<K: Into<Vec<u8>>>(&mut self, key: K);
-
-    /// Clear the object, removing all key-value pairs.
-    fn clear(&mut self);
-}
-
-/// A wrapper for a `*const spa_dict` struct that does not take ownership of the data,
-/// useful for dicts shared to us via FFI.
-pub struct ForeignDict {
-    ptr: ptr::NonNull<spa_sys::spa_dict>,
-}
-
-impl ForeignDict {
-    /// Wraps the provided pointer in a read-only `ForeignDict` struct without taking ownership of the struct pointed to.
-    ///
-    /// # Safety
-    ///
-    /// - The provided pointer must point to a valid, well-aligned `spa_dict` struct.
-    /// - The struct pointed to must be kept valid for the entire lifetime of the created `Dict`.
-    ///
-    /// Violating any of these rules will result in undefined behaviour.
-    pub unsafe fn from_ptr(ptr: ptr::NonNull<spa_sys::spa_dict>) -> Self {
-        Self { ptr }
-    }
-}
-
-impl ReadableDict for ForeignDict {
-    fn get_dict_ptr(&self) -> *const spa_sys::spa_dict {
-        self.ptr.as_ptr()
-    }
-}
-
-impl fmt::Debug for ForeignDict {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.debug("ForeignDict", f)
-    }
-}
-
 bitflags! {
     /// Dictionary flags
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -274,9 +247,7 @@ bitflags! {
 /// Iterator on a dictionary's keys and values exposed as [`CStr`].
 #[derive(Clone)]
 pub struct CIter<'a> {
-    next: *const spa_sys::spa_dict_item,
-    /// Points to the first element outside of the allocated area, or null for empty dicts
-    end: *const spa_sys::spa_dict_item,
+    items: &'a [spa_sys::spa_dict_item],
     _phantom: PhantomData<&'a str>,
 }
 
@@ -284,19 +255,16 @@ impl<'a> Iterator for CIter<'a> {
     type Item = (&'a CStr, &'a CStr);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if !self.next.is_null() && self.next < self.end {
-            let k = unsafe { CStr::from_ptr((*self.next).key) };
-            let v = unsafe { CStr::from_ptr((*self.next).value) };
-            self.next = unsafe { self.next.add(1) };
-            Some((k, v))
-        } else {
-            None
-        }
+        self.items.split_first().map(|(item, rest)| {
+            self.items = rest;
+            let k = unsafe { CStr::from_ptr(item.key) };
+            let v = unsafe { CStr::from_ptr(item.value) };
+            (k, v)
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let bound: usize = unsafe { self.next.offset_from(self.end) as usize };
-
+        let bound = self.items.len();
         // We know the exact value, so lower bound and upper bound are the same.
         (bound, Some(bound))
     }
@@ -360,7 +328,6 @@ impl<'a> Iterator for Values<'a> {
 /// # Examples
 /// Create a `StaticDict` and access the stored values by key:
 /// ```rust
-/// use libspa::prelude::*;
 /// use libspa::{utils::dict::StaticDict, static_dict};
 ///
 /// static DICT: StaticDict = static_dict!{
@@ -381,7 +348,7 @@ impl StaticDict {
     /// # Safety
     /// - The provided pointer must point to a valid, well-aligned `spa_dict` struct.
     /// - The struct and its content need to stay alive during the whole lifetime of the `StaticDict`.
-    /// - The keys and values stored in this dict has to be static strings.
+    /// - The keys and values stored in this dict have to be static strings.
     pub const unsafe fn from_ptr(ptr: ptr::NonNull<spa_sys::spa_dict>) -> Self {
         Self { ptr }
     }
@@ -407,7 +374,7 @@ macro_rules! static_dict {
         use $crate::utils::dict::{spa_dict_item, StaticDict, Flags};
         use std::ptr;
 
-        const ITEMS: &[spa_dict_item] = &[
+        static mut ITEMS: &[spa_dict_item] = &[
             $(
                 spa_dict_item {
                     key: concat!($k, "\0").as_ptr() as *const std::os::raw::c_char,
@@ -416,10 +383,12 @@ macro_rules! static_dict {
             )+
         ];
 
-        const RAW: spa_sys::spa_dict = spa_sys::spa_dict {
-            flags: Flags::empty().bits(),
-            n_items: ITEMS.len() as u32,
-            items: ITEMS.as_ptr(),
+        static mut RAW: spa_sys::spa_dict = unsafe {
+            spa_sys::spa_dict {
+                flags: Flags::empty().bits(),
+                n_items: ITEMS.len() as u32,
+                items: ITEMS.as_ptr(),
+            }
         };
 
         unsafe {
@@ -429,15 +398,19 @@ macro_rules! static_dict {
     }};
 }
 
-impl ReadableDict for StaticDict {
-    fn get_dict_ptr(&self) -> *const spa_sys::spa_dict {
-        self.ptr.as_ptr()
+impl std::ops::Deref for StaticDict {
+    type Target = DictRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.cast::<Self::Target>().as_ref() }
     }
 }
 
 impl fmt::Debug for StaticDict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.debug("StaticDict", f)
+        let dict: &DictRef = self.as_ref();
+        // FIXME: Debug-print dict keys and values directly
+        f.debug_tuple("StaticDict").field(dict).finish()
     }
 }
 
@@ -446,7 +419,7 @@ unsafe impl Sync for StaticDict {}
 
 #[cfg(test)]
 mod tests {
-    use super::{Flags, ForeignDict, ReadableDict, StaticDict};
+    use super::{DictRef, Flags, StaticDict};
     use spa_sys::spa_dict;
     use std::{ffi::CString, ptr};
 
@@ -458,7 +431,7 @@ mod tests {
             items: ptr::null(),
         };
 
-        let dict = unsafe { ForeignDict::from_ptr(ptr::NonNull::from(&raw)) };
+        let dict = DictRef(raw);
         let iter = dict.iter_cstr();
 
         assert_eq!(0, dict.len());
@@ -530,7 +503,7 @@ mod tests {
         };
 
         assert_eq!(
-            r#"StaticDict { flags: Flags(0x0), entries: {"K0": "V0"} }"#,
+            r#"StaticDict(DictRef { flags: Flags(0x0), entries: {"K0": "V0"} })"#,
             &format!("{:?}", dict)
         );
 
@@ -540,10 +513,10 @@ mod tests {
             items: ptr::null(),
         };
 
-        let dict = unsafe { ForeignDict::from_ptr(ptr::NonNull::from(&raw)) };
+        let dict = DictRef(raw);
 
         assert_eq!(
-            r#"ForeignDict { flags: Flags(SORTED), entries: {} }"#,
+            r#"DictRef { flags: Flags(SORTED), entries: {} }"#,
             &format!("{:?}", dict)
         );
     }

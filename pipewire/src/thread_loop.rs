@@ -1,14 +1,17 @@
 // Copyright The pipewire-rs Contributors.
 // SPDX-License-Identifier: MIT
 
-use std::mem::MaybeUninit;
-use std::ops::Deref;
-use std::ptr;
-use std::rc::{Rc, Weak};
+use std::{
+    mem::MaybeUninit,
+    ops::Deref,
+    ptr,
+    rc::{Rc, Weak},
+};
 
-use crate::loop_::{AsLoop, LoopRef};
-use crate::{error::Error, properties::Properties};
-use spa::utils::dict::ReadableDict;
+use crate::{
+    error::Error,
+    loop_::{AsLoop, LoopRef},
+};
 
 /// A wrapper around the pipewire threaded loop interface. ThreadLoops are a higher level
 /// of abstraction around the loop interface. A ThreadLoop can be used to spawn a new thread
@@ -24,16 +27,16 @@ impl ThreadLoop {
     /// # Safety
     pub unsafe fn new(name: Option<&str>) -> Result<Self, Error> {
         super::init();
-        let inner = ThreadLoopInner::new::<Properties>(name, None)?;
+        let inner = ThreadLoopInner::new(name, None)?;
         Ok(Self {
             inner: Rc::new(inner),
         })
     }
 
     /// Create a new ThreadLoop with the given `name` and `properties`.
-    pub fn with_properties<T: ReadableDict>(
+    pub fn with_properties(
         name: Option<&str>,
-        properties: &T,
+        properties: &spa::utils::dict::DictRef,
     ) -> Result<Self, Error> {
         let inner = ThreadLoopInner::new(name, Some(properties))?;
         Ok(Self {
@@ -113,9 +116,12 @@ pub struct ThreadLoopInner {
 }
 
 impl ThreadLoopInner {
-    fn new<T: ReadableDict>(name: Option<&str>, properties: Option<&T>) -> Result<Self, Error> {
+    fn new(
+        name: Option<&str>,
+        properties: Option<&spa::utils::dict::DictRef>,
+    ) -> Result<Self, Error> {
         unsafe {
-            let props = properties.map_or(ptr::null(), |props| props.get_dict_ptr()) as *mut _;
+            let props = properties.map_or(ptr::null(), |props| props.as_raw_ptr());
             let l = pw_sys::pw_thread_loop_new(
                 name.map_or(ptr::null(), |p| p.as_ptr() as *const _),
                 props,

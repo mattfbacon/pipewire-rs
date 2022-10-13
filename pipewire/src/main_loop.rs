@@ -5,9 +5,10 @@ use std::ops::Deref;
 use std::ptr;
 use std::rc::{Rc, Weak};
 
-use crate::loop_::{AsLoop, LoopRef};
-use crate::{error::Error, properties::Properties};
-use spa::utils::dict::ReadableDict;
+use crate::{
+    error::Error,
+    loop_::{AsLoop, LoopRef},
+};
 
 #[derive(Debug, Clone)]
 pub struct MainLoop {
@@ -18,13 +19,13 @@ impl MainLoop {
     /// Initialize Pipewire and create a new `MainLoop`
     pub fn new() -> Result<Self, Error> {
         super::init();
-        let inner = MainLoopInner::new::<Properties>(None)?;
+        let inner = MainLoopInner::new(None)?;
         Ok(Self {
             inner: Rc::new(inner),
         })
     }
 
-    pub fn with_properties<T: ReadableDict>(properties: &T) -> Result<Self, Error> {
+    pub fn with_properties(properties: &spa::utils::dict::DictRef) -> Result<Self, Error> {
         let inner = MainLoopInner::new(Some(properties))?;
         Ok(Self {
             inner: Rc::new(inner),
@@ -75,9 +76,9 @@ pub struct MainLoopInner {
 }
 
 impl MainLoopInner {
-    fn new<T: ReadableDict>(properties: Option<&T>) -> Result<Self, Error> {
+    fn new(properties: Option<&spa::utils::dict::DictRef>) -> Result<Self, Error> {
         unsafe {
-            let props = properties.map_or(ptr::null(), |props| props.get_dict_ptr()) as *mut _;
+            let props = properties.map_or(ptr::null(), |props| props.as_raw()) as *mut _;
             let l = pw_sys::pw_main_loop_new(props);
             let ptr = ptr::NonNull::new(l).ok_or(Error::CreationFailed)?;
 

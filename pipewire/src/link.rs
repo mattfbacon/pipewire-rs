@@ -7,7 +7,6 @@ use std::{
 
 use bitflags::bitflags;
 use spa::spa_interface_call_method;
-use spa::utils::dict::ForeignDict;
 
 use crate::{
     proxy::{Listener, Proxy, ProxyT},
@@ -139,14 +138,11 @@ impl<'a> LinkListenerLocalBuilder<'a> {
 
 pub struct LinkInfo {
     ptr: ptr::NonNull<pw_sys::pw_link_info>,
-    props: Option<ForeignDict>,
 }
 
 impl LinkInfo {
     fn new(ptr: ptr::NonNull<pw_sys::pw_link_info>) -> Self {
-        let props_ptr = unsafe { ptr.as_ref().props };
-        let props = ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ForeignDict::from_ptr(ptr) });
-        Self { ptr, props }
+        Self { ptr }
     }
 
     pub fn id(&self) -> u32 {
@@ -203,8 +199,10 @@ impl LinkInfo {
         }
     }
 
-    pub fn props(&self) -> Option<&ForeignDict> {
-        self.props.as_ref()
+    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
+        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
+
+        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
     }
 }
 

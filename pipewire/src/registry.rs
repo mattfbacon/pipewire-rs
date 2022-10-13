@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 use libc::{c_char, c_void};
-use std::mem;
-use std::pin::Pin;
+
 use std::{
     ffi::{CStr, CString},
+    mem,
+    pin::Pin,
     ptr,
 };
 
@@ -16,7 +17,6 @@ use crate::{
     types::ObjectType,
     Error,
 };
-use spa::{prelude::*, utils::dict::ForeignDict};
 
 #[derive(Debug)]
 pub struct Registry {
@@ -41,7 +41,10 @@ impl Registry {
         }
     }
 
-    pub fn bind<T: ProxyT, D: ReadableDict>(&self, object: &GlobalObject<D>) -> Result<T, Error> {
+    pub fn bind<T: ProxyT, P: AsRef<spa::utils::dict::DictRef>>(
+        &self,
+        object: &GlobalObject<P>,
+    ) -> Result<T, Error> {
         let proxy = unsafe {
             let type_ = CString::new(object.type_.to_str()).unwrap();
             let version = object.type_.client_version();
@@ -87,11 +90,13 @@ impl Drop for Registry {
     }
 }
 
+type GlobalCallback = dyn Fn(&GlobalObject<&spa::utils::dict::DictRef>);
+type GlobalRemoveCallback = dyn Fn(u32);
+
 #[derive(Default)]
 struct ListenerLocalCallbacks {
-    #[allow(clippy::type_complexity)]
-    global: Option<Box<dyn Fn(&GlobalObject<ForeignDict>)>>,
-    global_remove: Option<Box<dyn Fn(u32)>>,
+    global: Option<Box<GlobalCallback>>,
+    global_remove: Option<Box<GlobalRemoveCallback>>,
 }
 
 pub struct ListenerLocalBuilder<'a> {
@@ -118,7 +123,7 @@ impl<'a> ListenerLocalBuilder<'a> {
     #[must_use]
     pub fn global<F>(mut self, global: F) -> Self
     where
-        F: Fn(&GlobalObject<ForeignDict>) + 'static,
+        F: Fn(&GlobalObject<&spa::utils::dict::DictRef>) + 'static,
     {
         self.cbs.global = Some(Box::new(global));
         self
@@ -195,16 +200,16 @@ impl<'a> ListenerLocalBuilder<'a> {
 }
 
 #[derive(Debug)]
-pub struct GlobalObject<D: ReadableDict> {
+pub struct GlobalObject<P: AsRef<spa::utils::dict::DictRef>> {
     pub id: u32,
     pub permissions: PermissionFlags,
     pub type_: ObjectType,
     pub version: u32,
-    pub props: Option<D>,
+    pub props: Option<P>,
 }
 
-impl GlobalObject<ForeignDict> {
-    fn new(
+impl GlobalObject<&spa::utils::dict::DictRef> {
+    unsafe fn new(
         id: u32,
         permissions: u32,
         type_: &str,
@@ -213,8 +218,8 @@ impl GlobalObject<ForeignDict> {
     ) -> Self {
         let type_ = ObjectType::from_str(type_);
         let permissions = PermissionFlags::from_bits_retain(permissions);
-        let props = props as *mut _;
-        let props = ptr::NonNull::new(props).map(|ptr| unsafe { ForeignDict::from_ptr(ptr) });
+        let props = ptr::NonNull::new(props.cast_mut())
+            .map(|ptr| ptr.cast::<spa::utils::dict::DictRef>().as_ref());
 
         Self {
             id,
@@ -226,7 +231,7 @@ impl GlobalObject<ForeignDict> {
     }
 }
 
-impl<D: ReadableDict> GlobalObject<D> {
+impl<P: AsRef<spa::utils::dict::DictRef>> GlobalObject<P> {
     pub fn to_owned(&self) -> GlobalObject<Properties> {
         GlobalObject {
             id: self.id,
@@ -236,7 +241,7 @@ impl<D: ReadableDict> GlobalObject<D> {
             props: self
                 .props
                 .as_ref()
-                .map(|props| Properties::from_dict(props)),
+                .map(|props| Properties::from_dict(props.as_ref())),
         }
     }
 }

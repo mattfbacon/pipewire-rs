@@ -17,10 +17,7 @@ use crate::{
 };
 use spa::{
     spa_interface_call_method,
-    utils::{
-        dict::ForeignDict,
-        result::{AsyncSeq, SpaResult},
-    },
+    utils::result::{AsyncSeq, SpaResult},
 };
 
 pub const PW_ID_CORE: u32 = pw_sys::PW_ID_CORE;
@@ -142,7 +139,7 @@ impl CoreInner {
     ///     .expect("Failed to connect to Pipewire Core");
     ///
     /// // This call uses turbofish syntax to specify that we want a link.
-    /// let link = core.create_object::<pw::link::Link, _>(
+    /// let link = core.create_object::<pw::link::Link>(
     ///     // The actual name for a link factory might be different for your system,
     ///     // you should probably obtain a factory from the registry.
     ///     "link-factory",
@@ -157,10 +154,10 @@ impl CoreInner {
     /// ```
     ///
     /// See `pipewire/examples/create-delete-remote-objects.rs` in the crates repository for a more detailed example.
-    pub fn create_object<P: ProxyT, D: crate::spa::utils::dict::ReadableDict>(
+    pub fn create_object<P: ProxyT>(
         &self,
         factory_name: &str,
-        properties: &D,
+        properties: &impl AsRef<spa::utils::dict::DictRef>,
     ) -> Result<P, Error> {
         let type_ = P::type_();
         let factory_name = CString::new(factory_name).expect("Null byte in factory_name parameter");
@@ -175,7 +172,7 @@ impl CoreInner {
                 factory_name.as_ptr(),
                 type_str.as_ptr(),
                 type_.client_version(),
-                properties.get_dict_ptr(),
+                properties.as_ref().as_raw_ptr(),
                 0
             )
         };
@@ -343,19 +340,11 @@ impl<'a> ListenerLocalBuilder<'a> {
 
 pub struct Info {
     ptr: ptr::NonNull<pw_sys::pw_core_info>,
-    /// Can contain a Dict wrapping the raw spa_dict at (*ptr).props.
-    ///
-    /// Since it is our responsibility that it does not stay alive longer than the raw dict,
-    /// we store it here and only hand out borrows to it.
-    props: Option<ForeignDict>,
 }
 
 impl Info {
     fn new(info: ptr::NonNull<pw_sys::pw_core_info>) -> Self {
-        let props_ptr = unsafe { info.as_ref().props };
-        let props = ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ForeignDict::from_ptr(ptr) });
-
-        Self { ptr: info, props }
+        Self { ptr: info }
     }
 
     pub fn id(&self) -> u32 {
@@ -395,8 +384,10 @@ impl Info {
         ChangeMask::from_bits_retain(mask)
     }
 
-    pub fn props(&self) -> Option<&ForeignDict> {
-        self.props.as_ref()
+    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
+        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
+
+        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
     }
 }
 

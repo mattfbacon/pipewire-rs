@@ -33,10 +33,9 @@ impl ContextRef {
             props.cast().as_ref()
         }
     }
-
-    pub fn update_properties<D: crate::spa::utils::dict::ReadableDict>(&self, properties: &D) {
+    pub fn update_properties(&self, properties: &spa::utils::dict::DictRef) {
         unsafe {
-            pw_sys::pw_context_update_properties(self.as_raw_ptr(), properties.get_dict_ptr());
+            pw_sys::pw_context_update_properties(self.as_raw_ptr(), properties.as_raw_ptr());
         }
     }
 }

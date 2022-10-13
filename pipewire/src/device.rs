@@ -10,7 +10,7 @@ use crate::{
     proxy::{Listener, Proxy, ProxyT},
     types::ObjectType,
 };
-use spa::{pod::Pod, spa_interface_call_method, utils::dict::ForeignDict};
+use spa::{pod::Pod, spa_interface_call_method};
 
 #[derive(Debug)]
 pub struct Device {
@@ -122,15 +122,11 @@ pub struct DeviceListenerLocalBuilder<'a> {
 
 pub struct DeviceInfo {
     ptr: ptr::NonNull<pw_sys::pw_device_info>,
-    props: Option<ForeignDict>,
 }
 
 impl DeviceInfo {
     fn new(ptr: ptr::NonNull<pw_sys::pw_device_info>) -> Self {
-        let props_ptr = unsafe { ptr.as_ref().props };
-        let props = ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ForeignDict::from_ptr(ptr) });
-
-        Self { ptr, props }
+        Self { ptr }
     }
 
     pub fn id(&self) -> u32 {
@@ -142,8 +138,10 @@ impl DeviceInfo {
         DeviceChangeMask::from_bits(mask).expect("invalid change_mask")
     }
 
-    pub fn props(&self) -> Option<&ForeignDict> {
-        self.props.as_ref()
+    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
+        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
+
+        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
     }
 
     /// Get the param infos for the device.

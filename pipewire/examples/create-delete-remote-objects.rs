@@ -2,7 +2,6 @@ use std::{cell::Cell, rc::Rc};
 
 use once_cell::unsync::OnceCell;
 use pipewire as pw;
-use pw::prelude::*;
 use pw::types::ObjectType;
 
 fn main() {
@@ -22,7 +21,7 @@ fn main() {
     let reg_listener = registry
         .add_listener_local()
         .global(move |global| {
-            if let Some(ref props) = global.props {
+            if let Some(props) = global.props {
                 // Check that the global is a factory that creates the right type.
                 if props.get("factory.type.name") == Some(ObjectType::Link.to_str()) {
                     let factory_name = props.get("factory.name").expect("Factory has no name");
@@ -45,7 +44,7 @@ fn main() {
 
     // Now that we have the name of a link factory, we can create an object with it!
     let link = core
-        .create_object::<pw::link::Link, _>(
+        .create_object::<pw::link::Link>(
             factory.get().expect("No link factory found"),
             &pw::properties::properties! {
                 "link.output.port" => "1",

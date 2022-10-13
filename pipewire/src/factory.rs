@@ -12,7 +12,6 @@ use crate::{
     types::ObjectType,
 };
 use spa::spa_interface_call_method;
-use spa::utils::dict::ForeignDict;
 
 #[derive(Debug)]
 pub struct Factory {
@@ -64,15 +63,11 @@ pub struct FactoryListenerLocalBuilder<'a> {
 
 pub struct FactoryInfo {
     ptr: ptr::NonNull<pw_sys::pw_factory_info>,
-    props: Option<ForeignDict>,
 }
 
 impl FactoryInfo {
     fn new(ptr: ptr::NonNull<pw_sys::pw_factory_info>) -> Self {
-        let props_ptr = unsafe { ptr.as_ref().props };
-        let props = ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ForeignDict::from_ptr(ptr) });
-
-        Self { ptr, props }
+        Self { ptr }
     }
 
     pub fn id(&self) -> u32 {
@@ -92,8 +87,10 @@ impl FactoryInfo {
         FactoryChangeMask::from_bits(mask).expect("invalid change_mask")
     }
 
-    pub fn props(&self) -> Option<&ForeignDict> {
-        self.props.as_ref()
+    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
+        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
+
+        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
     }
 }
 
