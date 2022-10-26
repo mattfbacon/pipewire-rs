@@ -5,6 +5,8 @@ use crate::pod::{
 use crate::utils;
 use std::{io, ops::Range};
 
+pub const MAX_CHANNELS: usize = spa_sys::SPA_AUDIO_MAX_CHANNELS as usize;
+
 #[repr(transparent)]
 #[derive(PartialEq, PartialOrd, Eq, Clone, Copy)]
 pub struct AudioFormat(u32);
@@ -78,13 +80,13 @@ impl AudioFormat {
 }
 
 struct AudioPosition {
-    position: [u32; spa_sys::SPA_AUDIO_MAX_CHANNELS as _],
+    position: [u32; MAX_CHANNELS],
     channels: u32,
 }
 
 impl AudioPosition {
     fn new(pos: &[u32]) -> Self {
-        let mut position = [0; spa_sys::SPA_AUDIO_MAX_CHANNELS as _];
+        let mut position = [0; MAX_CHANNELS];
         let channels = pos.len();
         position[0..channels].copy_from_slice(pos);
         Self {

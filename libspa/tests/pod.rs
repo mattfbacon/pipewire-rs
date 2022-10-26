@@ -2153,7 +2153,7 @@ fn pointer() {
     );
 }
 
-use libspa::audio::{AudioFormat, AudioInfoRaw};
+use libspa::audio::{self, AudioFormat, AudioInfoRaw};
 
 struct AudioInfoRawWithId(u32, AudioInfoRaw);
 
@@ -2239,13 +2239,14 @@ fn composite_values() {
 #[test]
 fn audio_info_raw() {
     let id = 1;
+    let position = Some([0; audio::MAX_CHANNELS]);
     let obj_rs = AudioInfoRawWithId(
         id,
         AudioInfoRaw {
             channels: 1,
             rate: 44100,
             format: AudioFormat::S8,
-            ..Default::default()
+            position,
         },
     );
     let vec_rs: Vec<u8> = PodSerializer::serialize(Cursor::new(Vec::new()), &obj_rs)
