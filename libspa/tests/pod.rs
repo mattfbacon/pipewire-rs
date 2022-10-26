@@ -115,6 +115,12 @@ pub mod c {
             n_elems: u32,
             elems: *const i64,
         ) -> *const spa_pod;
+        pub fn build_audio_info_raw(
+            buffer: *mut u8,
+            len: usize,
+            id: u32,
+            audio_raw: *const spa_sys::spa_audio_info_raw,
+        ) -> *const spa_pod;
         pub fn build_pointer(
             buffer: *mut u8,
             len: usize,
@@ -2147,6 +2153,20 @@ fn pointer() {
     );
 }
 
+use libspa::audio::{AudioFormat, AudioInfoRaw};
+
+struct AudioInfoRawWithId(u32, AudioInfoRaw);
+
+impl PodSerialize for AudioInfoRawWithId {
+    fn serialize<O: std::io::Write + std::io::Seek>(
+        &self,
+        serializer: PodSerializer<O>,
+    ) -> Result<SerializeSuccess<O>, cookie_factory::GenError> {
+        let serializer = serializer.serialize_object(spa_sys::SPA_TYPE_OBJECT_Format, self.0)?;
+        self.1.serialize(serializer)
+    }
+}
+
 #[test]
 #[cfg_attr(miri, ignore)]
 fn composite_values() {
@@ -2214,4 +2234,30 @@ fn composite_values() {
         PodDeserializer::deserialize_any_from(&vec_rs_val),
         Ok((&[] as &[u8], object_val))
     );
+}
+
+#[test]
+fn audio_info_raw() {
+    let id = 1;
+    let obj_rs = AudioInfoRawWithId(
+        id,
+        AudioInfoRaw {
+            channels: 1,
+            rate: 44100,
+            format: AudioFormat::S8,
+            ..Default::default()
+        },
+    );
+    let vec_rs: Vec<u8> = PodSerializer::serialize(Cursor::new(Vec::new()), &obj_rs)
+        .unwrap()
+        .0
+        .into_inner();
+
+    let mut vec_c: Vec<u8> = vec![0; vec_rs.len()];
+    let obj_c: spa_sys::spa_audio_info_raw = obj_rs.1.into();
+    assert_ne!(
+        unsafe { c::build_audio_info_raw(vec_c.as_mut_ptr(), vec_c.len(), id, &obj_c) },
+        std::ptr::null()
+    );
+    assert_eq!(vec_rs, vec_c);
 }

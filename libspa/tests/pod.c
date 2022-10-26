@@ -242,6 +242,11 @@ struct spa_pod *build_choice_fd(uint8_t *buffer, size_t len, uint32_t choice_typ
 	return spa_pod_builder_pop(&b, &f);
 }
 
+struct spa_pod *build_audio_info_raw(uint8_t *buffer, size_t len, uint32_t id, struct spa_audio_info_raw *info) {
+  struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, len);
+  return spa_format_audio_raw_build(&b, id, info);
+}
+
 int build_pointer(uint8_t *buffer, size_t len, uint32_t type, const void *val)
 {
 	struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, len);
