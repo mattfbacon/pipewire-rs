@@ -206,3 +206,23 @@ impl AudioInfoRaw {
         serializer.end()
     }
 }
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum AudioFormatParam {
+    AudioInfoRaw(AudioInfoRaw),
+}
+
+impl PodSerialize for AudioFormatParam {
+    fn serialize<O: io::Write + io::Seek>(
+        &self,
+        serializer: PodSerializer<O>,
+    ) -> Result<SerializeSuccess<O>, GenError> {
+        let serializer = serializer.serialize_object(
+            spa_sys::SPA_TYPE_OBJECT_Format,
+            spa_sys::SPA_PARAM_EnumFormat,
+        )?;
+        match self {
+            Self::AudioInfoRaw(v) => v.serialize(serializer),
+        }
+    }
+}
