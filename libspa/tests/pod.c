@@ -247,6 +247,12 @@ struct spa_pod *build_audio_info_raw(uint8_t *buffer, size_t len, uint32_t id, s
   return spa_format_audio_raw_build(&b, id, info);
 }
 
+int parse_audio_info_raw(const struct spa_pod *format) {
+  struct spa_audio_info_raw info;
+  int res = spa_format_audio_raw_parse(format, &info);
+  return res;
+}
+
 int build_pointer(uint8_t *buffer, size_t len, uint32_t type, const void *val)
 {
 	struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, len);

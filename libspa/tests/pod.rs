@@ -121,6 +121,7 @@ pub mod c {
             id: u32,
             audio_raw: *const spa_sys::spa_audio_info_raw,
         ) -> *const spa_pod;
+        pub fn parse_audio_info_raw(val: *const spa_pod) -> i32;
         pub fn build_pointer(
             buffer: *mut u8,
             len: usize,
@@ -2261,4 +2262,5 @@ fn audio_info_raw() {
         std::ptr::null()
     );
     assert_eq!(vec_rs, vec_c);
+    assert!(unsafe { c::parse_audio_info_raw(vec_c.as_mut_ptr()) } > 0);
 }
