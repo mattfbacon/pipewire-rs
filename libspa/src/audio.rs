@@ -54,8 +54,6 @@ impl AudioFormat {
     pub const F32_BE: Self = Self(spa_sys::SPA_AUDIO_FORMAT_F32_BE);
     pub const F64_LE: Self = Self(spa_sys::SPA_AUDIO_FORMAT_F64_LE);
     pub const F64_BE: Self = Self(spa_sys::SPA_AUDIO_FORMAT_F64_BE);
-    pub const ULAW: Self = Self(spa_sys::SPA_AUDIO_FORMAT_ULAW);
-    pub const ALAW: Self = Self(spa_sys::SPA_AUDIO_FORMAT_ALAW);
 
     pub const U8P: Self = Self(spa_sys::SPA_AUDIO_FORMAT_U8P);
     pub const S16P: Self = Self(spa_sys::SPA_AUDIO_FORMAT_S16P);
