@@ -1,3 +1,6 @@
+// Copyright The pipewire-rs Contributors.
+// SPDX-License-Identifier: MIT
+
 use crate::pod::{
     self,
     serialize::{GenError, ObjectPodSerializer, PodSerialize, PodSerializer, SerializeSuccess},
