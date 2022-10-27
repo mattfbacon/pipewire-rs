@@ -167,7 +167,7 @@ impl From<AudioInfoRaw> for Vec<Property> {
                 let array = position[0..channels as usize]
                     .iter()
                     .copied()
-                    .map(|p| utils::Id(p))
+                    .map(utils::Id)
                     .collect();
                 props.push(Property::new(
                     spa_sys::SPA_FORMAT_AUDIO_position,
