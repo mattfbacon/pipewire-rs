@@ -1,12 +1,9 @@
 // Copyright The pipewire-rs Contributors.
 // SPDX-License-Identifier: MIT
 
-use crate::pod::{
-    self,
-    serialize::{GenError, ObjectPodSerializer, PodSerialize, PodSerializer, SerializeSuccess},
-};
+use crate::pod::{Property, Value, ValueArray};
 use crate::utils;
-use std::{io, ops::Range};
+use std::ops::Range;
 
 pub const MAX_CHANNELS: usize = spa_sys::SPA_AUDIO_MAX_CHANNELS as usize;
 
@@ -82,35 +79,6 @@ impl AudioFormat {
     }
 }
 
-struct AudioPosition {
-    position: [u32; MAX_CHANNELS],
-    channels: u32,
-}
-
-impl AudioPosition {
-    fn new(pos: &[u32]) -> Self {
-        let mut position = [0; MAX_CHANNELS];
-        let channels = pos.len();
-        position[0..channels].copy_from_slice(pos);
-        Self {
-            position,
-            channels: channels as u32,
-        }
-    }
-}
-impl PodSerialize for AudioPosition {
-    fn serialize<O: io::Write + io::Seek>(
-        &self,
-        serializer: PodSerializer<O>,
-    ) -> Result<SerializeSuccess<O>, GenError> {
-        let mut serializer = serializer.serialize_array::<utils::Id>(self.channels)?;
-        for p in &self.position[0..self.channels as usize] {
-            serializer.serialize_element(&utils::Id(*p))?;
-        }
-        serializer.end()
-    }
-}
-
 /// Rust representation of [`spa_sys::spa_audio_info_raw`].
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct AudioInfoRaw {
@@ -157,75 +125,57 @@ impl From<AudioInfoRaw> for spa_sys::spa_audio_info_raw {
     }
 }
 
-impl AudioInfoRaw {
-    /// Serialize [`Self`] into an [`ObjectPodSerializer`].
-    pub fn serialize<O: io::Write + io::Seek>(
-        &self,
-        mut serializer: ObjectPodSerializer<O>,
-    ) -> Result<SerializeSuccess<O>, GenError> {
-        serializer.serialize_property(
+impl From<AudioInfoRaw> for Vec<Property> {
+    fn from(value: AudioInfoRaw) -> Self {
+        let mut props = Vec::with_capacity(6);
+        props.push(Property::new(
             spa_sys::SPA_FORMAT_mediaType,
-            &utils::Id(spa_sys::SPA_MEDIA_TYPE_audio),
-            pod::PropertyFlags::empty(),
-        )?;
-
-        serializer.serialize_property(
+            Value::Id(utils::Id(spa_sys::SPA_MEDIA_TYPE_audio)),
+        ));
+        props.push(Property::new(
             spa_sys::SPA_FORMAT_mediaSubtype,
-            &utils::Id(spa_sys::SPA_MEDIA_SUBTYPE_raw),
-            pod::PropertyFlags::empty(),
-        )?;
+            Value::Id(utils::Id(spa_sys::SPA_MEDIA_SUBTYPE_raw)),
+        ));
 
-        if self.format != AudioFormat::UNKNOWN {
-            serializer.serialize_property(
+        let AudioInfoRaw {
+            format,
+            position,
+            rate,
+            channels,
+        } = value;
+
+        if format != AudioFormat::UNKNOWN {
+            props.push(Property::new(
                 spa_sys::SPA_FORMAT_AUDIO_format,
-                &utils::Id(self.format.into()),
-                pod::PropertyFlags::empty(),
-            )?;
+                Value::Id(utils::Id(format.into())),
+            ));
         }
 
-        if self.rate != 0 {
-            serializer.serialize_property(
+        if rate != 0 {
+            props.push(Property::new(
                 spa_sys::SPA_FORMAT_AUDIO_rate,
-                &(self.rate as i32),
-                pod::PropertyFlags::empty(),
-            )?;
+                Value::Int(rate as i32),
+            ));
         }
 
-        if self.channels != 0 {
-            serializer.serialize_property(
+        if channels != 0 {
+            props.push(Property::new(
                 spa_sys::SPA_FORMAT_AUDIO_channels,
-                &(self.channels as i32),
-                pod::PropertyFlags::empty(),
-            )?;
-            if let Some(position) = self.position {
-                serializer.serialize_property(
+                Value::Int(channels as i32),
+            ));
+            if let Some(position) = position {
+                let array = position[0..channels as usize]
+                    .iter()
+                    .copied()
+                    .map(|p| utils::Id(p))
+                    .collect();
+                props.push(Property::new(
                     spa_sys::SPA_FORMAT_AUDIO_position,
-                    &AudioPosition::new(&position[0..self.channels as usize]),
-                    pod::PropertyFlags::empty(),
-                )?;
+                    Value::ValueArray(ValueArray::Id(array)),
+                ));
             }
         }
 
-        serializer.end()
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum AudioFormatParam {
-    AudioInfoRaw(AudioInfoRaw),
-}
-
-impl PodSerialize for AudioFormatParam {
-    fn serialize<O: io::Write + io::Seek>(
-        &self,
-        serializer: PodSerializer<O>,
-    ) -> Result<SerializeSuccess<O>, GenError> {
-        let serializer = serializer.serialize_object(
-            spa_sys::SPA_TYPE_OBJECT_Format,
-            spa_sys::SPA_PARAM_EnumFormat,
-        )?;
-        match self {
-            Self::AudioInfoRaw(v) => v.serialize(serializer),
-        }
+        props
     }
 }

@@ -1103,6 +1103,16 @@ pub struct Property {
     pub value: Value,
 }
 
+impl Property {
+    pub fn new(key: u32, value: Value) -> Self {
+        Self {
+            key,
+            value,
+            flags: PropertyFlags::empty(),
+        }
+    }
+}
+
 bitflags! {
     /// Property flags
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]

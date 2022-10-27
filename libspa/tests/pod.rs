@@ -2156,18 +2156,6 @@ fn pointer() {
 
 use libspa::audio::{self, AudioFormat, AudioInfoRaw};
 
-struct AudioInfoRawWithId(u32, AudioInfoRaw);
-
-impl PodSerialize for AudioInfoRawWithId {
-    fn serialize<O: std::io::Write + std::io::Seek>(
-        &self,
-        serializer: PodSerializer<O>,
-    ) -> Result<SerializeSuccess<O>, cookie_factory::GenError> {
-        let serializer = serializer.serialize_object(spa_sys::SPA_TYPE_OBJECT_Format, self.0)?;
-        self.1.serialize(serializer)
-    }
-}
-
 #[test]
 #[cfg_attr(miri, ignore)]
 fn composite_values() {
@@ -2241,22 +2229,25 @@ fn composite_values() {
 fn audio_info_raw() {
     let id = 1;
     let position = Some([0; audio::MAX_CHANNELS]);
-    let obj_rs = AudioInfoRawWithId(
+    let info = AudioInfoRaw {
+        channels: 1,
+        rate: 44100,
+        format: AudioFormat::S8,
+        position,
+    };
+
+    let obj_rs = Value::Object(Object {
+        type_: spa_sys::SPA_TYPE_OBJECT_Format,
         id,
-        AudioInfoRaw {
-            channels: 1,
-            rate: 44100,
-            format: AudioFormat::S8,
-            position,
-        },
-    );
+        properties: info.into(),
+    });
     let vec_rs: Vec<u8> = PodSerializer::serialize(Cursor::new(Vec::new()), &obj_rs)
         .unwrap()
         .0
         .into_inner();
 
     let mut vec_c: Vec<u8> = vec![0; vec_rs.len()];
-    let obj_c: spa_sys::spa_audio_info_raw = obj_rs.1.into();
+    let obj_c: spa_sys::spa_audio_info_raw = info.into();
     assert_ne!(
         unsafe { c::build_audio_info_raw(vec_c.as_mut_ptr(), vec_c.len(), id, &obj_c) },
         std::ptr::null()

@@ -71,7 +71,11 @@ pub fn main() -> Result<(), pw::Error> {
 
     let values: Vec<u8> = pw::spa::pod::serialize::PodSerializer::serialize(
         std::io::Cursor::new(Vec::new()),
-        &pw::spa::audio::AudioFormatParam::AudioInfoRaw(audio_info),
+        &pw::spa::pod::Value::Object(pw::spa::pod::Object {
+            type_: spa_sys::SPA_TYPE_OBJECT_Format,
+            id: spa_sys::SPA_PARAM_EnumFormat,
+            properties: audio_info.into(),
+        }),
     )
     .unwrap()
     .0
