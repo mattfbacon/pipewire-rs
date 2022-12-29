@@ -1,7 +1,10 @@
 // Copyright The pipewire-rs Contributors.
 // SPDX-License-Identifier: MIT
 
-use std::{os::unix::prelude::RawFd, ptr};
+use std::{
+    os::unix::prelude::{IntoRawFd, OwnedFd},
+    ptr,
+};
 
 use crate::core_::Core;
 use crate::error::Error;
@@ -53,11 +56,12 @@ impl<T: AsRef<LoopRef> + Clone> Context<T> {
         }
     }
 
-    pub fn connect_fd(&self, fd: RawFd, properties: Option<Properties>) -> Result<Core, Error> {
+    pub fn connect_fd(&self, fd: OwnedFd, properties: Option<Properties>) -> Result<Core, Error> {
         let properties = properties.map_or(ptr::null_mut(), |p| p.into_raw());
 
         unsafe {
-            let core = pw_sys::pw_context_connect_fd(self.as_ptr(), fd, properties, 0);
+            let raw_fd = fd.into_raw_fd();
+            let core = pw_sys::pw_context_connect_fd(self.as_ptr(), raw_fd, properties, 0);
             let ptr = ptr::NonNull::new(core).ok_or(Error::CreationFailed)?;
 
             Ok(Core::from_ptr(ptr))

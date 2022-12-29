@@ -35,15 +35,17 @@ impl LoopRef {
     }
 
     /// Get the file descriptor backing this loop.
-    pub fn fd(&self) -> RawFd {
+    pub fn fd(&self) -> BorrowedFd<'_> {
         unsafe {
             let mut iface = self.as_raw().control.as_ref().unwrap().iface;
 
-            spa_interface_call_method!(
+            let raw_fd = spa_interface_call_method!(
                 &mut iface as *mut spa_sys::spa_interface,
                 spa_sys::spa_loop_control_methods,
                 get_fd,
-            )
+            );
+
+            BorrowedFd::borrow_raw(raw_fd)
         }
     }
 
