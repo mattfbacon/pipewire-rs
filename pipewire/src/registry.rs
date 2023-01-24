@@ -1,7 +1,6 @@
 // Copyright The pipewire-rs Contributors.
 // SPDX-License-Identifier: MIT
 
-use bitflags::bitflags;
 use libc::{c_char, c_void};
 use std::mem;
 use std::pin::Pin;
@@ -11,6 +10,7 @@ use std::{
 };
 
 use crate::{
+    permissions::PermissionFlags,
     proxy::{Proxy, ProxyT},
     types::ObjectType,
     Error, Properties,
@@ -193,22 +193,10 @@ impl<'a> ListenerLocalBuilder<'a> {
     }
 }
 
-bitflags! {
-    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-    pub struct Permission: u32 {
-        const R = pw_sys::PW_PERM_R;
-        const W = pw_sys::PW_PERM_W;
-        const X = pw_sys::PW_PERM_X;
-        const M = pw_sys::PW_PERM_M;
-        #[cfg(feature = "v0_3_77")]
-        const L = pw_sys::PW_PERM_L;
-    }
-}
-
 #[derive(Debug)]
 pub struct GlobalObject<D: ReadableDict> {
     pub id: u32,
-    pub permissions: Permission,
+    pub permissions: PermissionFlags,
     pub type_: ObjectType,
     pub version: u32,
     pub props: Option<D>,
@@ -223,7 +211,7 @@ impl GlobalObject<ForeignDict> {
         props: *const spa_sys::spa_dict,
     ) -> Self {
         let type_ = ObjectType::from_str(type_);
-        let permissions = Permission::from_bits_retain(permissions);
+        let permissions = PermissionFlags::from_bits_retain(permissions);
         let props = props as *mut _;
         let props = ptr::NonNull::new(props).map(|ptr| unsafe { ForeignDict::from_ptr(ptr) });
 
