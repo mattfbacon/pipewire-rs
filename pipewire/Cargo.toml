@@ -15,7 +15,7 @@ keywords = ["pipewire", "multimedia", "audio", "video"]
 
 [dependencies]
 pw_sys = { package = "pipewire-sys", version = "0", path = "../pipewire-sys" }
-spa_sys = { package = "libspa-sys", version ="0", path = "../libspa-sys" }
+spa_sys = { package = "libspa-sys", version = "0", path = "../libspa-sys" }
 spa = { package = "libspa", version = "0", path = "../libspa" }
 anyhow = "1"
 thiserror = "1"
@@ -32,8 +32,10 @@ once_cell = "1.5"
 [features]
 v0_3_32 = []
 v0_3_33 = ["spa/v0_3_33", "v0_3_32"]
-v0_3_39 = ["v0_3_33"]
-v0_3_41 = ["v0_3_39"]
+v0_3_34 = ["v0_3_33"]
+v0_3_39 = ["v0_3_34"]
+v0_3_40 = ["v0_3_39"]
+v0_3_41 = ["v0_3_40"]
 v0_3_43 = ["v0_3_41"]
 v0_3_44 = ["v0_3_43"]
 v0_3_45 = ["v0_3_44"]

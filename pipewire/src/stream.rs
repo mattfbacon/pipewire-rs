@@ -301,6 +301,19 @@ impl<D> Stream<D> {
         unsafe { pw_sys::pw_stream_get_node_id(self.as_ptr()) }
     }
 
+    #[cfg(feature = "v0_3_34")]
+    pub fn is_driving(&self) -> bool {
+        unsafe { pw_sys::pw_stream_is_driving(self.as_ptr()) }
+    }
+
+    #[cfg(feature = "v0_3_34")]
+    pub fn trigger_process(&self) -> Result<(), Error> {
+        let r = unsafe { pw_sys::pw_stream_trigger_process(self.as_ptr()) };
+
+        SpaResult::from_c(r).into_result()?;
+        Ok(())
+    }
+
     // TODO: pw_stream_get_core()
     // TODO: pw_stream_get_time()
 }
@@ -380,6 +393,10 @@ pub struct ListenerLocalCallbacks<D> {
     pub remove_buffer: Option<Box<dyn FnMut(*mut pw_sys::pw_buffer)>>,
     pub process: Option<Box<ProcessCB<D>>>,
     pub drained: Option<Box<dyn FnMut()>>,
+    #[cfg(feature = "v0_3_39")]
+    pub command: Option<Box<dyn FnMut(*const spa_sys::spa_command)>>,
+    #[cfg(feature = "v0_3_40")]
+    pub trigger_done: Option<Box<dyn FnMut()>>,
     pub user_data: D,
     stream: Option<ptr::NonNull<pw_sys::pw_stream>>,
 }
@@ -396,6 +413,10 @@ impl<D> ListenerLocalCallbacks<D> {
             param_changed: Default::default(),
             remove_buffer: Default::default(),
             state_changed: Default::default(),
+            #[cfg(feature = "v0_3_39")]
+            command: Default::default(),
+            #[cfg(feature = "v0_3_40")]
+            trigger_done: Default::default(),
             user_data,
         }
     }
@@ -505,6 +526,27 @@ impl<D> ListenerLocalCallbacks<D> {
             }
         }
 
+        #[cfg(feature = "v0_3_39")]
+        unsafe extern "C" fn on_command<D>(
+            data: *mut ::std::os::raw::c_void,
+            command: *const spa_sys::spa_command,
+        ) {
+            if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
+                if let Some(cb) = &mut state.command {
+                    cb(command);
+                }
+            }
+        }
+
+        #[cfg(feature = "v0_3_40")]
+        unsafe extern "C" fn on_trigger_done<D>(data: *mut ::std::os::raw::c_void) {
+            if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
+                if let Some(cb) = &mut state.trigger_done {
+                    cb();
+                }
+            }
+        }
+
         let events = unsafe {
             let mut events: Pin<Box<pw_sys::pw_stream_events>> = Box::pin(mem::zeroed());
             events.version = pw_sys::PW_VERSION_STREAM_EVENTS;
@@ -532,6 +574,14 @@ impl<D> ListenerLocalCallbacks<D> {
             }
             if callbacks.drained.is_some() {
                 events.drained = Some(on_drained::<D>);
+            }
+            #[cfg(feature = "v0_3_39")]
+            if callbacks.command.is_some() {
+                events.command = Some(on_command::<D>);
+            }
+            #[cfg(feature = "v0_3_40")]
+            if callbacks.trigger_done.is_some() {
+                events.trigger_done = Some(on_trigger_done::<D>);
             }
 
             events
@@ -731,5 +781,7 @@ bitflags! {
         const EXCLUSIVE = pw_sys::pw_stream_flags_PW_STREAM_FLAG_EXCLUSIVE;
         const DONT_RECONNECT = pw_sys::pw_stream_flags_PW_STREAM_FLAG_DONT_RECONNECT;
         const ALLOC_BUFFERS = pw_sys::pw_stream_flags_PW_STREAM_FLAG_ALLOC_BUFFERS;
+        #[cfg(feature = "v0_3_41")]
+        const TRIGGER = pw_sys::pw_stream_flags_PW_STREAM_FLAG_TRIGGER;
     }
 }
