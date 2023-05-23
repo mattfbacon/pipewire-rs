@@ -15,6 +15,7 @@ Before you submit any code changes, please ensure that your code matches the fol
 - The code produces no compiler or clippy errors/warnings
 - No tests fail
 - The code adheres to the [rust api guidelines](https://rust-lang.github.io/api-guidelines/) (within reason)
+- The code adheres to our [guidelines for writing bindings](https://gitlab.freedesktop.org/pipewire/pipewire-rs/-/blob/main/docs/guidelines_for_bindings.md) (within reason)
 - New files need to have the following license and copyright header at the top:
   ```rust
   // Copyright The pipewire-rs Contributors.
