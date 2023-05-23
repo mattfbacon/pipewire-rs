@@ -6,7 +6,7 @@
     - [`pipewire`](https://pipewire.pages.freedesktop.org/pipewire-rs/pipewire/)
     - [`libspa`](https://pipewire.pages.freedesktop.org/pipewire-rs/libspa/index.html)
 - [Examples](https://gitlab.freedesktop.org/pipewire/pipewire-rs/-/tree/main/pipewire/examples)
-- [How to contribute](https://gitlab.freedesktop.org/pipewire/pipewire-rs/-/blob/main/CONTRIBUTING.md)
+- [How to contribute](https://gitlab.freedesktop.org/pipewire/pipewire-rs/-/blob/main/docs/CONTRIBUTING.md)
 
 ### **These bindings are work-in-progress. Expect frequent breakage, bugs and missing features.**
 
