@@ -321,7 +321,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-/// Iterator on a dictionary's values.
+/// Iterator on a dictionary's keys.
 pub struct Keys<'a> {
     inner: CIter<'a>,
 }
