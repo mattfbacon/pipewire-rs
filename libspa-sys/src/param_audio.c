@@ -1,6 +1,6 @@
 #include <spa/param/audio/format-utils.h>
 
-int libspa_rs_audio_raw_parse(const struct spa_pod* format, struct spa_audio_info_raw* info) {
+int libspa_rs_format_audio_raw_parse(const struct spa_pod* format, struct spa_audio_info_raw* info) {
     return spa_format_audio_raw_parse(format, info);
 }
 
