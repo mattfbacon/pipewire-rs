@@ -20,6 +20,7 @@ libc = "0.2"
 errno = "0.3"
 cookie-factory = "0.3.2"
 nom = "7"
+convert_case = "0.6"
 
 [dev-dependencies]
 pipewire-sys = { version = "0", path = "../pipewire-sys" }

@@ -85,6 +85,8 @@ extern "C" {
 
     #[link_name = "libspa_rs_debug_type_find"]
     pub fn spa_debug_type_find(info: *const spa_type_info, type_: u32) -> *const spa_type_info;
+    #[link_name = "libspa_rs_debug_type_find_name"]
+    pub fn spa_debug_type_find_name(info: *const spa_type_info, type_: u32) -> *const c_char;
     #[link_name = "libspa_rs_debug_type_find_short_name"]
     pub fn spa_debug_type_find_short_name(info: *const spa_type_info, type_: u32) -> *const c_char;
 }
@@ -101,6 +103,19 @@ mod test {
             let type_info = super::spa_debug_type_find(spa_type_media_type, SPA_MEDIA_TYPE_audio);
             assert_eq!(
                 ffi::CStr::from_ptr((*type_info).name),
+                ffi::CString::new("Spa:Enum:MediaType:audio")
+                    .unwrap()
+                    .as_ref()
+            );
+        }
+    }
+
+    #[test]
+    fn test_libspa_rs_debug_type_find_name() {
+        unsafe {
+            let name = super::spa_debug_type_find_name(spa_type_media_type, SPA_MEDIA_TYPE_audio);
+            assert_eq!(
+                ffi::CStr::from_ptr(name),
                 ffi::CString::new("Spa:Enum:MediaType:audio")
                     .unwrap()
                     .as_ref()

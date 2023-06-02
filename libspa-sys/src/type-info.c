@@ -66,6 +66,13 @@ const struct spa_type_info* libspa_rs_debug_type_find(
     return spa_debug_type_find(info, type);
 }
 
+const char* libspa_rs_debug_type_find_name(
+    const struct spa_type_info* info,
+    uint32_t type
+) {
+    return spa_debug_type_find_name(info, type);
+}
+
 const char* libspa_rs_debug_type_find_short_name(
     const struct spa_type_info* info,
     uint32_t type

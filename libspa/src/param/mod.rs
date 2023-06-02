@@ -3,6 +3,8 @@
 
 //! Types for dealing with SPA parameters.
 
+pub mod format_utils;
+
 use std::ffi::CStr;
 use std::fmt::Debug;
 
