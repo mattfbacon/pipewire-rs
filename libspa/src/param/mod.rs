@@ -3,6 +3,7 @@
 
 //! Types for dealing with SPA parameters.
 
+use std::ffi::CStr;
 use std::fmt::Debug;
 
 /// Different parameter types that can be queried
@@ -57,31 +58,18 @@ impl ParamType {
     }
 }
 
-// FIXME: Use `spa_type_param` type-info array and `spa_debug_type_find_name`
-// when https://gitlab.freedesktop.org/pipewire/pipewire-rs/-/merge_requests/142 (or safe bindings) are merged
 impl Debug for ParamType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = match *self {
-            Self::Invalid => "Invalid",
-            Self::PropInfo => "PropInfo",
-            Self::Props => "Props",
-            Self::EnumFormat => "EnumFormat",
-            Self::Format => "Format",
-            Self::Buffers => "Buffers",
-            Self::Meta => "Meta",
-            Self::IO => "IO",
-            Self::EnumProfile => "EnumProfile",
-            Self::Profile => "Profile",
-            Self::EnumPortConfig => "EnumPortConfig",
-            Self::PortConfig => "PortConfig",
-            Self::EnumRoute => "EnumRoute",
-            Self::Route => "Route",
-            Self::Control => "Control",
-            Self::Latency => "Latency",
-            Self::ProcessLatency => "ProcessLatency",
-            _ => "Unknown",
+        let c_str = unsafe {
+            let c_buf =
+                spa_sys::spa_debug_type_find_short_name(spa_sys::spa_type_param, self.as_raw());
+            if c_buf.is_null() {
+                return f.write_str("Unknown");
+            }
+            CStr::from_ptr(c_buf)
         };
-        f.write_str(name)
+        let name = format!("ParamType::{}", c_str.to_string_lossy());
+        f.write_str(&name)
     }
 }
 
