@@ -3,6 +3,8 @@
 
 use crate::pod::{Property, Value, ValueArray};
 use crate::utils;
+use std::ffi::CStr;
+use std::fmt::Debug;
 use std::ops::Range;
 
 pub const MAX_CHANNELS: usize = spa_sys::SPA_AUDIO_MAX_CHANNELS as usize;
@@ -74,6 +76,29 @@ impl AudioFormat {
     /// Get the raw [`spa_sys::spa_audio_format`] representing this `AudioFormat`.
     pub fn as_raw(&self) -> spa_sys::spa_audio_format {
         self.0
+    }
+}
+
+impl Debug for AudioFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            AudioFormat::Unknown => f.write_str("AudioFormat::Unknown"),
+            AudioFormat::Encoded => f.write_str("AudioFormat::Encoded"),
+            _ => {
+                let c_str = unsafe {
+                    let c_buf = spa_sys::spa_debug_type_find_short_name(
+                        spa_sys::spa_type_audio_format,
+                        self.as_raw(),
+                    );
+                    if c_buf.is_null() {
+                        return f.write_str("Unsupported");
+                    }
+                    CStr::from_ptr(c_buf)
+                };
+                let name = format!("AudioFormat::{}", c_str.to_str().unwrap());
+                f.write_str(&name)
+            }
+        }
     }
 }
 
@@ -208,5 +233,23 @@ impl From<AudioInfoRaw> for Vec<Property> {
         }
 
         props
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn debug_format() {
+        assert_eq!(
+            "AudioFormat::Unknown",
+            format!("{:?}", AudioFormat::Unknown)
+        );
+        assert_eq!(
+            "AudioFormat::S24_32LE",
+            format!("{:?}", AudioFormat::S24_32LE)
+        );
     }
 }
