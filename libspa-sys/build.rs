@@ -55,6 +55,7 @@ fn compile_reexported_symbols(libs: &system_deps::Dependencies) {
         "src/param.c",
         "src/param_audio.c",
         "src/param_video.c",
+        "src/pod/builder.c",
         "src/pod/parser.c",
     ];
 
