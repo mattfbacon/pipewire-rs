@@ -3,6 +3,7 @@
 
 use crate::pod::{Property, Value, ValueArray};
 use crate::utils;
+use crate::{Error, SpaResult, SpaSuccess};
 use std::ffi::CStr;
 use std::fmt::Debug;
 use std::ops::Range;
@@ -169,6 +170,12 @@ impl AudioInfoRaw {
 
     pub fn position(&self) -> [u32; 64usize] {
         self.0.position
+    }
+
+    /// helper function to parse format properties type
+    pub fn parse(&mut self, format: &crate::pod::Pod) -> Result<SpaSuccess, Error> {
+        let res = unsafe { spa_sys::spa_format_audio_raw_parse(format.as_raw_ptr(), &mut self.0) };
+        SpaResult::from_c(res).into_result()
     }
 
     /// Obtain an [`AudioInfoRaw`] from a raw `spa_audio_info_raw` variant.
