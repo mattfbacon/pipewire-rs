@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 use anyhow::Result;
+use clap::Parser;
 use pipewire as pw;
 use std::{cell::RefCell, collections::HashMap};
 use std::{rc::Rc, sync::Arc};
-use structopt::StructOpt;
 
 use pw::link::Link;
 use pw::metadata::Metadata;
@@ -205,17 +205,17 @@ fn monitor(remote: Option<String>) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "pw-mon", about = "PipeWire monitor")]
+#[derive(Parser)]
+#[clap(name = "pw-mon", about = "PipeWire monitor")]
 struct Opt {
-    #[structopt(short, long, help = "The name of the remote to connect to")]
+    #[clap(short, long, help = "The name of the remote to connect to")]
     remote: Option<String>,
 }
 
 fn main() -> Result<()> {
     pw::init();
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
     monitor(opt.remote)?;
 
     unsafe {

@@ -9,19 +9,19 @@ use pipewire as pw;
 use pw::prelude::*;
 use pw::{properties, spa};
 
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "streams", about = "Stream example")]
+#[derive(Parser)]
+#[clap(name = "streams", about = "Stream example")]
 struct Opt {
-    #[structopt(short, long, help = "The target object id to connect to")]
+    #[clap(short, long, help = "The target object id to connect to")]
     target: Option<u32>,
 }
 
 pub fn main() -> Result<(), pw::Error> {
     pw::init();
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     let mainloop = pw::MainLoop::new()?;
 
