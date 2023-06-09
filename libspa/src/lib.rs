@@ -18,7 +18,6 @@ pub mod list;
 pub mod pod;
 pub mod utils;
 pub use direction::*;
-pub mod audio;
 pub mod flags;
 pub mod format;
 pub mod param;

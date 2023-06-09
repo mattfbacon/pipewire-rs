@@ -2154,7 +2154,7 @@ fn pointer() {
     );
 }
 
-use libspa::audio::{self, AudioFormat, AudioInfoRaw};
+use libspa::param::audio::{self, AudioFormat, AudioInfoRaw};
 
 #[test]
 #[cfg_attr(miri, ignore)]

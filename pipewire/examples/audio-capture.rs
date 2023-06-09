@@ -16,7 +16,7 @@ use std::convert::TryInto;
 use std::mem;
 
 struct UserData {
-    format: spa::audio::AudioInfoRaw,
+    format: spa::param::audio::AudioInfoRaw,
     cursor_move: bool,
 }
 
@@ -149,8 +149,8 @@ pub fn main() -> Result<(), pw::Error> {
      * id means that this is a format enumeration (of 1 value).
      * We leave the channels and rate empty to accept the native graph
      * rate and channels. */
-    let mut audio_info = pw::spa::audio::AudioInfoRaw::new();
-    audio_info.set_format(pw::spa::audio::AudioFormat::F32LE);
+    let mut audio_info = spa::param::audio::AudioInfoRaw::new();
+    audio_info.set_format(spa::param::audio::AudioFormat::F32LE);
     let obj = pw::spa::pod::Object {
         type_: pw::spa::utils::SpaTypes::ObjectParamFormat.as_raw(),
         id: pw::spa::param::ParamType::EnumFormat.as_raw(),

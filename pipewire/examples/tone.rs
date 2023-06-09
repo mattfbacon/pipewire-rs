@@ -68,8 +68,8 @@ pub fn main() -> Result<(), pw::Error> {
         })
         .register()?;
 
-    let mut audio_info = pw::spa::audio::AudioInfoRaw::new();
-    audio_info.set_format(pw::spa::audio::AudioFormat::S16LE);
+    let mut audio_info = spa::param::audio::AudioInfoRaw::new();
+    audio_info.set_format(spa::param::audio::AudioFormat::S16LE);
     audio_info.set_rate(DEFAULT_RATE);
     audio_info.set_channels(DEFAULT_CHANNELS);
 
