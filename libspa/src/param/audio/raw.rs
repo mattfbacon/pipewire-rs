@@ -146,3 +146,15 @@ impl From<AudioInfoRaw> for Vec<Property> {
         props
     }
 }
+
+impl Debug for AudioInfoRaw {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AudioInfoRaw")
+            .field("format", &self.format())
+            .field("flags", &self.flags())
+            .field("rate", &self.rate())
+            .field("channels", &self.channels())
+            .field("position", &self.position())
+            .finish()
+    }
+}
