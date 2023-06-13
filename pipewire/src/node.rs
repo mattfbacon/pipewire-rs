@@ -73,6 +73,19 @@ impl Node {
             );
         }
     }
+
+    pub fn set_param(&self, id: spa::param::ParamType, flags: u32, param: &[u8]) {
+        unsafe {
+            spa_interface_call_method!(
+                self.proxy.as_ptr(),
+                pw_sys::pw_node_methods,
+                set_param,
+                id.as_raw(),
+                flags,
+                param.as_ptr() as *const spa::sys::spa_pod
+            );
+        }
+    }
 }
 
 impl ProxyT for Node {
