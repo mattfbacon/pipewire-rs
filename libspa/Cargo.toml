@@ -35,3 +35,4 @@ libspa = { name = "libspa-0.2", version = "0.2" }
 
 [features]
 v0_3_33 = []
+v0_3_75 = ["v0_3_33"]
