@@ -11,6 +11,10 @@ use pw::{properties, spa};
 
 use clap::Parser;
 
+struct UserData {
+    format: spa::param::video::VideoInfoRaw,
+}
+
 #[derive(Parser)]
 #[clap(name = "streams", about = "Stream example")]
 struct Opt {
@@ -25,7 +29,11 @@ pub fn main() -> Result<(), pw::Error> {
 
     let mainloop = pw::MainLoop::new()?;
 
-    let stream = pw::stream::Stream::<i32>::with_user_data(
+    let data = UserData {
+        format: Default::default(),
+    };
+
+    let stream = pw::stream::Stream::<UserData>::with_user_data(
         &mainloop,
         "video-test",
         properties! {
@@ -33,35 +41,185 @@ pub fn main() -> Result<(), pw::Error> {
             *pw::keys::MEDIA_CATEGORY => "Capture",
             *pw::keys::MEDIA_ROLE => "Camera",
         },
-        0,
+        data,
     )
     .state_changed(|old, new| {
         println!("State changed: {:?} -> {:?}", old, new);
     })
-    .process(|stream, frame_count| {
-        println!("On frame");
+    .param_changed(|_, id, user_data, param| {
+        if param.is_null() || id != pw::spa::param::ParamType::Format.as_raw() {
+            return;
+        }
+
+        let (media_type, media_subtype) = unsafe {
+            match pw::spa::param::format_utils::spa_parse_format(param) {
+                Ok(v) => v,
+                Err(_) => return,
+            }
+        };
+
+        if media_type != pw::spa::format::MediaType::Video
+            || media_subtype != pw::spa::format::MediaSubtype::Raw
+        {
+            return;
+        }
+
+        unsafe {
+            user_data
+                .format
+                .parse(param)
+                .expect("Failed to parse param changed to VideoInfoRaw")
+        };
+
+        println!("got video format:");
+        println!(
+            "  format: {} ({:?})",
+            user_data.format.format().as_raw(),
+            user_data.format.format()
+        );
+        println!(
+            "  size: {}x{}",
+            user_data.format.size().width,
+            user_data.format.size().height
+        );
+        println!(
+            "  framerate: {}/{}",
+            user_data.format.framerate().num,
+            user_data.format.framerate().denom
+        );
+
+        // prepare to render video of this size
+    })
+    .process(|stream, _| {
         match stream.dequeue_buffer() {
-            None => println!("No buffer received"),
+            None => println!("out of buffers"),
             Some(mut buffer) => {
                 let datas = buffer.datas_mut();
-                println!("Frame {}. Got {} datas.", frame_count, datas.len());
-                *frame_count += 1;
-                // TODO: get the frame size and display it
+                if datas.is_empty() {
+                    return;
+                }
+
+                // copy frame data to screen
+                let data = &mut datas[0];
+                println!("got a frame of size {}", data.chunk().size());
             }
         }
     })
-    // TODO: connect params_changed
     .create()?;
 
     println!("Created stream {:#?}", stream);
 
-    // TODO: set params
+    let obj = pw::spa::pod::Object {
+        type_: pw::spa::utils::SpaTypes::ObjectParamFormat.as_raw(),
+        id: pw::spa::param::ParamType::EnumFormat.as_raw(),
+        properties: [
+            pw::spa::pod::Property {
+                key: pw::spa::format::FormatProperties::MediaType.as_raw(),
+                flags: pw::spa::pod::PropertyFlags::empty(),
+                value: pw::spa::pod::Value::Id(pw::spa::utils::Id(
+                    pw::spa::format::MediaType::Video.as_raw(),
+                )),
+            },
+            pw::spa::pod::Property {
+                key: pw::spa::format::FormatProperties::MediaSubtype.as_raw(),
+                flags: pw::spa::pod::PropertyFlags::empty(),
+                value: pw::spa::pod::Value::Id(pw::spa::utils::Id(
+                    pw::spa::format::MediaSubtype::Raw.as_raw(),
+                )),
+            },
+            pw::spa::pod::Property {
+                key: pw::spa::format::FormatProperties::VideoFormat.as_raw(),
+                flags: pw::spa::pod::PropertyFlags::empty(),
+                value: pw::spa::pod::Value::Choice(pw::spa::pod::ChoiceValue::Id(
+                    pw::spa::utils::Choice::<pw::spa::utils::Id>(
+                        pw::spa::utils::ChoiceFlags::empty(),
+                        pw::spa::utils::ChoiceEnum::<pw::spa::utils::Id>::Enum {
+                            default: pw::spa::utils::Id(
+                                pw::spa::param::video::VideoFormat::RGB.as_raw(),
+                            ),
+                            alternatives: [
+                                pw::spa::utils::Id(
+                                    pw::spa::param::video::VideoFormat::RGB.as_raw(),
+                                ),
+                                pw::spa::utils::Id(
+                                    pw::spa::param::video::VideoFormat::RGBA.as_raw(),
+                                ),
+                                pw::spa::utils::Id(
+                                    pw::spa::param::video::VideoFormat::RGBx.as_raw(),
+                                ),
+                                pw::spa::utils::Id(
+                                    pw::spa::param::video::VideoFormat::BGRx.as_raw(),
+                                ),
+                                pw::spa::utils::Id(
+                                    pw::spa::param::video::VideoFormat::YUY2.as_raw(),
+                                ),
+                                pw::spa::utils::Id(
+                                    pw::spa::param::video::VideoFormat::I420.as_raw(),
+                                ),
+                            ]
+                            .to_vec(),
+                        },
+                    ),
+                )),
+            },
+            pw::spa::pod::Property {
+                key: pw::spa::format::FormatProperties::VideoSize.as_raw(),
+                flags: pw::spa::pod::PropertyFlags::empty(),
+                value: pw::spa::pod::Value::Choice(pw::spa::pod::ChoiceValue::Rectangle(
+                    pw::spa::utils::Choice::<pw::spa::utils::Rectangle>(
+                        pw::spa::utils::ChoiceFlags::empty(),
+                        pw::spa::utils::ChoiceEnum::<pw::spa::utils::Rectangle>::Range {
+                            default: pw::spa::utils::Rectangle {
+                                width: 320,
+                                height: 240,
+                            },
+                            min: pw::spa::utils::Rectangle {
+                                width: 1,
+                                height: 1,
+                            },
+                            max: pw::spa::utils::Rectangle {
+                                width: 4096,
+                                height: 4096,
+                            },
+                        },
+                    ),
+                )),
+            },
+            pw::spa::pod::Property {
+                key: pw::spa::format::FormatProperties::VideoFramerate.as_raw(),
+                flags: pw::spa::pod::PropertyFlags::empty(),
+                value: pw::spa::pod::Value::Choice(pw::spa::pod::ChoiceValue::Fraction(
+                    pw::spa::utils::Choice::<pw::spa::utils::Fraction>(
+                        pw::spa::utils::ChoiceFlags::empty(),
+                        pw::spa::utils::ChoiceEnum::<pw::spa::utils::Fraction>::Range {
+                            default: pw::spa::utils::Fraction { num: 25, denom: 1 },
+                            min: pw::spa::utils::Fraction { num: 0, denom: 1 },
+                            max: pw::spa::utils::Fraction {
+                                num: 1000,
+                                denom: 1,
+                            },
+                        },
+                    ),
+                )),
+            },
+        ]
+        .to_vec(),
+    };
+    let values = pw::spa::pod::serialize::PodSerializer::serialize(
+        std::io::Cursor::new(Vec::new()),
+        &pw::spa::pod::Value::Object(obj),
+    )
+    .unwrap()
+    .0
+    .into_inner();
+
+    let mut params = [values.as_ptr() as *const spa_sys::spa_pod];
 
     stream.connect(
         spa::Direction::Input,
         opt.target,
         pw::stream::StreamFlags::AUTOCONNECT | pw::stream::StreamFlags::MAP_BUFFERS,
-        &mut [],
+        &mut params,
     )?;
 
     println!("Connected stream");
