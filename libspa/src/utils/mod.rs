@@ -1,6 +1,8 @@
 //! Miscellaneous and utility items.
 
 use bitflags::bitflags;
+use convert_case::{Case, Casing};
+use std::{ffi::CStr, fmt::Debug};
 
 pub use spa_sys::spa_fraction as Fraction;
 pub use spa_sys::spa_rectangle as Rectangle;
@@ -69,4 +71,150 @@ pub enum ChoiceEnum<T: CanonicalFixedSizedPod> {
         /// possible flags.
         flags: Vec<T>,
     },
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct SpaTypes(pub spa_sys::_bindgen_ty_10);
+
+#[allow(non_upper_case_globals)]
+impl SpaTypes {
+    /* Basic types */
+    pub const None: Self = Self(spa_sys::SPA_TYPE_None);
+    pub const Bool: Self = Self(spa_sys::SPA_TYPE_Bool);
+    pub const Id: Self = Self(spa_sys::SPA_TYPE_Id);
+    pub const Int: Self = Self(spa_sys::SPA_TYPE_Int);
+    pub const Long: Self = Self(spa_sys::SPA_TYPE_Long);
+    pub const Float: Self = Self(spa_sys::SPA_TYPE_Float);
+    pub const Double: Self = Self(spa_sys::SPA_TYPE_Double);
+    pub const String: Self = Self(spa_sys::SPA_TYPE_String);
+    pub const Bytes: Self = Self(spa_sys::SPA_TYPE_Bytes);
+    pub const Rectangle: Self = Self(spa_sys::SPA_TYPE_Rectangle);
+    pub const Fraction: Self = Self(spa_sys::SPA_TYPE_Fraction);
+    pub const Bitmap: Self = Self(spa_sys::SPA_TYPE_Bitmap);
+    pub const Array: Self = Self(spa_sys::SPA_TYPE_Array);
+    pub const Struct: Self = Self(spa_sys::SPA_TYPE_Struct);
+    pub const Object: Self = Self(spa_sys::SPA_TYPE_Object);
+    pub const Sequence: Self = Self(spa_sys::SPA_TYPE_Sequence);
+    pub const Pointer: Self = Self(spa_sys::SPA_TYPE_Pointer);
+    pub const Fd: Self = Self(spa_sys::SPA_TYPE_Fd);
+    pub const Choice: Self = Self(spa_sys::SPA_TYPE_Choice);
+    pub const Pod: Self = Self(spa_sys::SPA_TYPE_Pod);
+
+    /* Pointers */
+    pub const PointerBuffer: Self = Self(spa_sys::SPA_TYPE_POINTER_Buffer);
+    pub const PointerMeta: Self = Self(spa_sys::SPA_TYPE_POINTER_Meta);
+    pub const PointerDict: Self = Self(spa_sys::SPA_TYPE_POINTER_Dict);
+
+    /* Events */
+    pub const EventDevice: Self = Self(spa_sys::SPA_TYPE_EVENT_Device);
+    pub const EventNode: Self = Self(spa_sys::SPA_TYPE_EVENT_Node);
+
+    /* Commands */
+    pub const CommandDevice: Self = Self(spa_sys::SPA_TYPE_COMMAND_Device);
+    pub const CommandNode: Self = Self(spa_sys::SPA_TYPE_COMMAND_Node);
+
+    /* Objects */
+    pub const ObjectParamPropInfo: Self = Self(spa_sys::SPA_TYPE_OBJECT_PropInfo);
+    pub const ObjectParamProps: Self = Self(spa_sys::SPA_TYPE_OBJECT_Props);
+    pub const ObjectParamFormat: Self = Self(spa_sys::SPA_TYPE_OBJECT_Format);
+    pub const ObjectParamBuffers: Self = Self(spa_sys::SPA_TYPE_OBJECT_ParamBuffers);
+    pub const ObjectParamMeta: Self = Self(spa_sys::SPA_TYPE_OBJECT_ParamMeta);
+    pub const ObjectParamIO: Self = Self(spa_sys::SPA_TYPE_OBJECT_ParamIO);
+    pub const ObjectParamProfile: Self = Self(spa_sys::SPA_TYPE_OBJECT_ParamProfile);
+    pub const ObjectParamPortConfig: Self = Self(spa_sys::SPA_TYPE_OBJECT_ParamPortConfig);
+    pub const ObjectParamRoute: Self = Self(spa_sys::SPA_TYPE_OBJECT_ParamRoute);
+    pub const ObjectProfiler: Self = Self(spa_sys::SPA_TYPE_OBJECT_Profiler);
+    pub const ObjectParamLatency: Self = Self(spa_sys::SPA_TYPE_OBJECT_ParamLatency);
+    pub const ObjectParamProcessLatency: Self = Self(spa_sys::SPA_TYPE_OBJECT_ParamProcessLatency);
+
+    /* vendor extensions */
+    pub const VendorPipeWire: Self = Self(spa_sys::SPA_TYPE_VENDOR_PipeWire);
+
+    pub const VendorOther: Self = Self(spa_sys::SPA_TYPE_VENDOR_Other);
+
+    /// Obtain a [`SpaTypes`] from a raw `_bindgen_ty_10` variant.
+    pub fn from_raw(raw: spa_sys::_bindgen_ty_10) -> Self {
+        Self(raw)
+    }
+
+    /// Get the raw [`spa_sys::_bindgen_ty_10`] representing this `SpaTypes`.
+    pub fn as_raw(&self) -> spa_sys::_bindgen_ty_10 {
+        self.0
+    }
+}
+
+impl Debug for SpaTypes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            SpaTypes::VendorPipeWire => f.write_str("SpaTypes::VendorPipeWire"),
+            SpaTypes::VendorOther => f.write_str("SpaTypes::VendorOther"),
+            _ => {
+                let c_str = unsafe {
+                    let c_buf =
+                        spa_sys::spa_debug_type_find_name(spa_sys::spa_types, self.as_raw());
+                    if c_buf.is_null() {
+                        return f.write_str("Unknown");
+                    }
+                    CStr::from_ptr(c_buf)
+                };
+                let name = format!(
+                    "SpaTypes::{}",
+                    c_str
+                        .to_string_lossy()
+                        .replace("Spa:Pointer", "Pointer")
+                        .replace("Spa:Pod:Object:Event", "Event")
+                        .replace("Spa:Pod:Object:Command", "Command")
+                        .replace("Spa:Pod:Object", "Object")
+                        .replace("Spa:Pod:", "")
+                        .replace("Spa:", "")
+                        .replace(':', " ")
+                        .to_case(Case::Pascal)
+                );
+                f.write_str(&name)
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn debug_format() {
+        assert_eq!("SpaTypes::None", format!("{:?}", SpaTypes::None));
+        assert_eq!(
+            "SpaTypes::PointerBuffer",
+            format!("{:?}", SpaTypes::PointerBuffer)
+        );
+        assert_eq!(
+            "SpaTypes::EventDevice",
+            format!("{:?}", SpaTypes::EventDevice)
+        );
+        assert_eq!(
+            "SpaTypes::CommandDevice",
+            format!("{:?}", SpaTypes::CommandDevice)
+        );
+        assert_eq!(
+            "SpaTypes::ObjectParamPropInfo",
+            format!("{:?}", SpaTypes::ObjectParamPropInfo)
+        );
+        assert_eq!(
+            "SpaTypes::ObjectProfiler",
+            format!("{:?}", SpaTypes::ObjectProfiler)
+        );
+        assert_eq!(
+            "SpaTypes::ObjectParamProcessLatency",
+            format!("{:?}", SpaTypes::ObjectParamProcessLatency)
+        );
+        assert_eq!(
+            "SpaTypes::VendorPipeWire",
+            format!("{:?}", SpaTypes::VendorPipeWire)
+        );
+        assert_eq!(
+            "SpaTypes::VendorOther",
+            format!("{:?}", SpaTypes::VendorOther)
+        );
+    }
 }
