@@ -3,42 +3,45 @@
 
 //! SPA direction.
 
-/// A port direction.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Direction {
-    /// Input
-    Input,
-    /// Output
-    Output,
-}
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct Direction(spa_sys::spa_direction);
 
+#[allow(non_upper_case_globals)]
 impl Direction {
-    /// The raw representation of the direction
-    pub fn as_raw(&self) -> spa_sys::spa_direction {
-        match self {
-            Self::Input => spa_sys::SPA_DIRECTION_INPUT,
-            Self::Output => spa_sys::SPA_DIRECTION_OUTPUT,
-        }
+    pub const Input: Self = Self(spa_sys::SPA_DIRECTION_INPUT);
+    pub const Output: Self = Self(spa_sys::SPA_DIRECTION_OUTPUT);
+
+    pub fn from_raw(raw: spa_sys::spa_direction) -> Self {
+        Self(raw)
     }
 
-    /// Create a `Direction` from a raw `spa_direction`.
-    ///
-    /// # Panics
-    /// This function will panic if `raw` is an invalid direction.
-    pub fn from_raw(raw: spa_sys::spa_direction) -> Self {
-        match raw {
-            spa_sys::SPA_DIRECTION_INPUT => Self::Input,
-            spa_sys::SPA_DIRECTION_OUTPUT => Self::Output,
-            _ => panic!("Invalid direction: {}", raw),
-        }
+    pub fn as_raw(&self) -> spa_sys::spa_direction {
+        self.0
     }
 
     /// Return a new [`Direction`] in the opposite direction, turning Input to Output, and Output to Input.
+    ///
+    /// An unknown/invalid direction is unchanged.
     pub fn reverse(&self) -> Self {
-        match self {
+        match *self {
             Self::Input => Self::Output,
             Self::Output => Self::Input,
+            _ => *self,
         }
+    }
+}
+
+impl std::fmt::Debug for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = format!(
+            "Direction::{}",
+            match *self {
+                Self::Input => "Input",
+                Self::Output => "Output",
+                _ => "Unknown",
+            }
+        );
+        f.write_str(&name)
     }
 }
 
@@ -62,12 +65,6 @@ mod tests {
             Direction::Output,
             Direction::from_raw(spa_sys::SPA_DIRECTION_OUTPUT)
         );
-    }
-
-    #[test]
-    #[should_panic]
-    fn invalid_direction() {
-        Direction::from_raw(u32::MAX);
     }
 
     #[test]

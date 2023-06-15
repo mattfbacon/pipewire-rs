@@ -1,40 +1,43 @@
 use std::{convert::TryFrom, fmt::Debug};
 
-#[derive(Debug)]
-pub enum DataType {
-    Invalid,
-    /// Pointer to memory, the data field in struct [`Data`] is set.
-    MemPtr,
-    /// Generic fd, `mmap` to get to memory
-    MemFd,
-    /// Fd to `dmabuf` memory
-    DmaBuf,
-    /// Memory is identified with an id
-    MemId,
-    Other(u32),
-}
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct DataType(spa_sys::spa_data_type);
 
+#[allow(non_upper_case_globals)]
 impl DataType {
-    pub fn from_raw(raw: u32) -> DataType {
-        match raw {
-            spa_sys::SPA_DATA_Invalid => Self::Invalid,
-            spa_sys::SPA_DATA_MemPtr => Self::MemPtr,
-            spa_sys::SPA_DATA_MemFd => Self::MemFd,
-            spa_sys::SPA_DATA_DmaBuf => Self::DmaBuf,
-            spa_sys::SPA_DATA_MemId => Self::MemId,
-            other => Self::Other(other),
-        }
+    pub const Invalid: Self = Self(spa_sys::SPA_DATA_Invalid);
+    /// Pointer to memory, the data field in struct [`Data`] is set.
+    pub const MemPtr: Self = Self(spa_sys::SPA_DATA_MemPtr);
+    /// Generic fd, `mmap` to get to memory
+    pub const MemFd: Self = Self(spa_sys::SPA_DATA_MemFd);
+    /// Fd to `dmabuf` memory
+    pub const DmaBuf: Self = Self(spa_sys::SPA_DATA_DmaBuf);
+    /// Memory is identified with an id
+    pub const MemId: Self = Self(spa_sys::SPA_DATA_MemId);
+
+    pub fn from_raw(raw: spa_sys::spa_data_type) -> Self {
+        Self(raw)
     }
 
-    pub fn as_raw(&self) -> u32 {
-        match self {
-            Self::Invalid => spa_sys::SPA_DATA_Invalid,
-            Self::MemPtr => spa_sys::SPA_DATA_MemPtr,
-            Self::MemFd => spa_sys::SPA_DATA_MemFd,
-            Self::DmaBuf => spa_sys::SPA_DATA_DmaBuf,
-            Self::MemId => spa_sys::SPA_DATA_MemId,
-            Self::Other(other) => *other,
-        }
+    pub fn as_raw(&self) -> spa_sys::spa_data_type {
+        self.0
+    }
+}
+
+impl std::fmt::Debug for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = format!(
+            "DataType::{}",
+            match *self {
+                Self::Invalid => "Invalid",
+                Self::MemPtr => "MemPtr",
+                Self::MemFd => "MemFd",
+                Self::DmaBuf => "DmaBuf",
+                Self::MemId => "MemId",
+                _ => "Unknown",
+            }
+        );
+        f.write_str(&name)
     }
 }
 
