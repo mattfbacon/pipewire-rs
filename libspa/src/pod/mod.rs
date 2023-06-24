@@ -1007,6 +1007,44 @@ pub struct Object {
     pub properties: Vec<Property>,
 }
 
+/// A macro for creating a new [`Object`] with properties.
+///
+/// The macro accepts the object type, id and a list of properties, seperated by commas.
+///
+/// # Examples:
+/// Create an `Object`.
+/// ```rust
+/// use libspa::pod::{object, property};
+///
+/// let pod_object = object!{
+///     libspa::utils::SpaTypes::ObjectParamFormat,
+///     libspa::param::ParamType::EnumFormat,
+///     property!(
+///         libspa::format::FormatProperties::MediaType,
+///         Id,
+///         libspa::format::MediaType::Video
+///     ),
+///     property!(
+///         libspa::format::FormatProperties::MediaSubtype,
+///         Id,
+///         libspa::format::MediaSubtype::Raw
+///     ),
+/// };
+/// ```
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __object__ {
+    ($type_:expr, $id:expr, $($properties:expr),* $(,)?) => {
+        pipewire::spa::pod::Object {
+            type_: $type_.as_raw(),
+            id: $id.as_raw(),
+            properties: [ $( $properties, )* ].to_vec(),
+        }
+    };
+}
+#[doc(inline)]
+pub use __object__ as object;
+
 /// An object property.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Property {
@@ -1037,3 +1075,124 @@ bitflags! {
         const DONT_FIXATE = spa_sys::SPA_POD_PROP_FLAG_DONT_FIXATE;
     }
 }
+
+/// A macro for creating a new Object [`Property`].
+///
+/// The macro accepts the following:
+/// - properties!(libspa::format::FormatProperties::`<key>`, Id, `<value>`)
+/// - properties!(libspa::format::FormatProperties::`<key>`, `<type>`, libspa::utils::`<type>`(`<value>`))
+/// - properties!(libspa::format::FormatProperties::`<key>`, Choice, Enum, Id, `<default>`, `<value>`, ...)
+/// - properties!(libspa::format::FormatProperties::`<key>`, Choice, Enum, `<type>`,
+///                 libspa::utils::`<type>`(`<default>`),
+///                 libspa::utils::`<type>`(`<value>`), ...)
+/// - properties!(libspa::format::FormatProperties::`<key>`, Choice, Flags, `<type>`,
+///                 libspa::utils::`<type>`(`<default>`),
+///                 libspa::utils::`<type>`(`<value>`), ...)
+/// - properties!(libspa::format::FormatProperties::`<key>`, Choice, Step, `<type>`,
+///                 libspa::utils::`<type>`(default),
+///                 libspa::utils::`<type>`(min),
+///                 libspa::utils::`<type>`(max),
+///                 libspa::utils::`<type>`(step))
+/// - properties!(libspa::format::FormatProperties::`<key>`, Choice, Range, `<type>`,
+///                 libspa::utils::`<type>`(default),
+///                 libspa::utils::`<type>`(min),
+///                 libspa::utils::`<type>`(max))
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __property__ {
+    ($key:expr, $value:expr) => {
+        pipewire::spa::pod::Property {
+            key: $key.as_raw(),
+            flags: pipewire::spa::pod::PropertyFlags::empty(),
+            value: $value,
+        }
+    };
+
+    ($key:expr, Id, $value:expr) => {
+        pipewire::spa::pod::property!($key, pipewire::spa::pod::Value::Id(pipewire::spa::utils::Id($value.as_raw())))
+    };
+
+    ($key:expr, $type_:ident, $value:expr) => {
+        pipewire::spa::pod::property!($key, pipewire::spa::pod::Value::$type_($value))
+    };
+
+    ($key:expr, Choice, Enum, Id, $default:expr, $($alternative:expr),+ $(,)?) => {
+        pipewire::spa::pod::property!(
+            $key,
+            pipewire::spa::pod::Value::Choice(pipewire::spa::pod::ChoiceValue::Id(
+                pipewire::spa::utils::Choice::<pipewire::spa::utils::Id>(
+                    pipewire::spa::utils::ChoiceFlags::empty(),
+                    pipewire::spa::utils::ChoiceEnum::<pipewire::spa::utils::Id>::Enum {
+                        default: pipewire::spa::utils::Id($default.as_raw()),
+                        alternatives: [ $( pipewire::spa::utils::Id($alternative.as_raw()), )+ ].to_vec()
+                    }
+                )
+            ))
+        )
+    };
+
+    ($key:expr, Choice, Enum, $type_:ident, $default:expr, $($alternative:expr),+ $(,)?) => {
+        pipewire::spa::pod::property!(
+            $key,
+            pipewire::spa::pod::Value::Choice(pipewire::spa::pod::ChoiceValue::$type_(
+                pipewire::spa::utils::Choice::<pipewire::spa::utils::$type_>(
+                    pipewire::spa::utils::ChoiceFlags::empty(),
+                    pipewire::spa::utils::ChoiceEnum::<pipewire::spa::utils::$type_>::Enum {
+                        default: $default,
+                        alternatives: [ $( $alternative, )+ ].to_vec()
+                    }
+                )
+            ))
+        )
+    };
+
+    ($key:expr, Choice, Flags, $type_:ident, $default:expr, $($alternative:expr),+ $(,)?) => {
+        pipewire::spa::pod::property!(
+            $key,
+            pipewire::spa::pod::Value::Choice(pipewire::spa::pod::ChoiceValue::$type_(
+                pipewire::spa::utils::Choice::<pipewire::spa::utils::$type_>(
+                    pipewire::spa::utils::ChoiceFlags::empty(),
+                    pipewire::spa::utils::ChoiceEnum::<pipewire::spa::utils::$type_>::Flags {
+                        default: $default,
+                        flags: [ $( $alternative, )+ ].to_vec()
+                    }
+                )
+            ))
+        )
+    };
+
+    ($key:expr, Choice, Step, $type_:ident, $default:expr, $min:expr, $max:expr, $step:expr) => {
+        pipewire::spa::pod::property!(
+            $key,
+            pipewire::spa::pod::Value::Choice(pipewire::spa::pod::ChoiceValue::$type_(
+                pipewire::spa::utils::Choice::<pipewire::spa::utils::$type_>(
+                    pipewire::spa::utils::ChoiceFlags::empty(),
+                    pipewire::spa::utils::ChoiceEnum::<pipewire::spa::utils::$type_>::Step {
+                        default: $default,
+                        min: $min,
+                        max: $max,
+                        step: $step,
+                    }
+                )
+            ))
+        )
+    };
+
+    ($key:expr, Choice, Range, $type_:ident, $default:expr, $min:expr, $max:expr) => {
+        pipewire::spa::pod::property!(
+            $key,
+            pipewire::spa::pod::Value::Choice(pipewire::spa::pod::ChoiceValue::$type_(
+                pipewire::spa::utils::Choice::<pipewire::spa::utils::$type_>(
+                    pipewire::spa::utils::ChoiceFlags::empty(),
+                    pipewire::spa::utils::ChoiceEnum::<pipewire::spa::utils::$type_>::Range {
+                        default: $default,
+                        min: $min,
+                        max: $max,
+                    }
+                )
+            ))
+        )
+    };
+}
+#[doc(inline)]
+pub use __property__ as property;

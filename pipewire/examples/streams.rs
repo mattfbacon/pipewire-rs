@@ -109,102 +109,63 @@ pub fn main() -> Result<(), pw::Error> {
 
     println!("Created stream {:#?}", stream);
 
-    let obj = pw::spa::pod::Object {
-        type_: pw::spa::utils::SpaTypes::ObjectParamFormat.as_raw(),
-        id: pw::spa::param::ParamType::EnumFormat.as_raw(),
-        properties: [
-            pw::spa::pod::Property {
-                key: pw::spa::format::FormatProperties::MediaType.as_raw(),
-                flags: pw::spa::pod::PropertyFlags::empty(),
-                value: pw::spa::pod::Value::Id(pw::spa::utils::Id(
-                    pw::spa::format::MediaType::Video.as_raw(),
-                )),
+    let obj = pw::spa::pod::object!(
+        pw::spa::utils::SpaTypes::ObjectParamFormat,
+        pw::spa::param::ParamType::EnumFormat,
+        pw::spa::pod::property!(
+            pw::spa::format::FormatProperties::MediaType,
+            Id,
+            pw::spa::format::MediaType::Video
+        ),
+        pw::spa::pod::property!(
+            pw::spa::format::FormatProperties::MediaSubtype,
+            Id,
+            pw::spa::format::MediaSubtype::Raw
+        ),
+        pw::spa::pod::property!(
+            pw::spa::format::FormatProperties::VideoFormat,
+            Choice,
+            Enum,
+            Id,
+            pw::spa::param::video::VideoFormat::RGB,
+            pw::spa::param::video::VideoFormat::RGB,
+            pw::spa::param::video::VideoFormat::RGBA,
+            pw::spa::param::video::VideoFormat::RGBx,
+            pw::spa::param::video::VideoFormat::BGRx,
+            pw::spa::param::video::VideoFormat::YUY2,
+            pw::spa::param::video::VideoFormat::I420,
+        ),
+        pw::spa::pod::property!(
+            pw::spa::format::FormatProperties::VideoSize,
+            Choice,
+            Range,
+            Rectangle,
+            pw::spa::utils::Rectangle {
+                width: 320,
+                height: 240
             },
-            pw::spa::pod::Property {
-                key: pw::spa::format::FormatProperties::MediaSubtype.as_raw(),
-                flags: pw::spa::pod::PropertyFlags::empty(),
-                value: pw::spa::pod::Value::Id(pw::spa::utils::Id(
-                    pw::spa::format::MediaSubtype::Raw.as_raw(),
-                )),
+            pw::spa::utils::Rectangle {
+                width: 1,
+                height: 1
             },
-            pw::spa::pod::Property {
-                key: pw::spa::format::FormatProperties::VideoFormat.as_raw(),
-                flags: pw::spa::pod::PropertyFlags::empty(),
-                value: pw::spa::pod::Value::Choice(pw::spa::pod::ChoiceValue::Id(
-                    pw::spa::utils::Choice::<pw::spa::utils::Id>(
-                        pw::spa::utils::ChoiceFlags::empty(),
-                        pw::spa::utils::ChoiceEnum::<pw::spa::utils::Id>::Enum {
-                            default: pw::spa::utils::Id(
-                                pw::spa::param::video::VideoFormat::RGB.as_raw(),
-                            ),
-                            alternatives: [
-                                pw::spa::utils::Id(
-                                    pw::spa::param::video::VideoFormat::RGB.as_raw(),
-                                ),
-                                pw::spa::utils::Id(
-                                    pw::spa::param::video::VideoFormat::RGBA.as_raw(),
-                                ),
-                                pw::spa::utils::Id(
-                                    pw::spa::param::video::VideoFormat::RGBx.as_raw(),
-                                ),
-                                pw::spa::utils::Id(
-                                    pw::spa::param::video::VideoFormat::BGRx.as_raw(),
-                                ),
-                                pw::spa::utils::Id(
-                                    pw::spa::param::video::VideoFormat::YUY2.as_raw(),
-                                ),
-                                pw::spa::utils::Id(
-                                    pw::spa::param::video::VideoFormat::I420.as_raw(),
-                                ),
-                            ]
-                            .to_vec(),
-                        },
-                    ),
-                )),
-            },
-            pw::spa::pod::Property {
-                key: pw::spa::format::FormatProperties::VideoSize.as_raw(),
-                flags: pw::spa::pod::PropertyFlags::empty(),
-                value: pw::spa::pod::Value::Choice(pw::spa::pod::ChoiceValue::Rectangle(
-                    pw::spa::utils::Choice::<pw::spa::utils::Rectangle>(
-                        pw::spa::utils::ChoiceFlags::empty(),
-                        pw::spa::utils::ChoiceEnum::<pw::spa::utils::Rectangle>::Range {
-                            default: pw::spa::utils::Rectangle {
-                                width: 320,
-                                height: 240,
-                            },
-                            min: pw::spa::utils::Rectangle {
-                                width: 1,
-                                height: 1,
-                            },
-                            max: pw::spa::utils::Rectangle {
-                                width: 4096,
-                                height: 4096,
-                            },
-                        },
-                    ),
-                )),
-            },
-            pw::spa::pod::Property {
-                key: pw::spa::format::FormatProperties::VideoFramerate.as_raw(),
-                flags: pw::spa::pod::PropertyFlags::empty(),
-                value: pw::spa::pod::Value::Choice(pw::spa::pod::ChoiceValue::Fraction(
-                    pw::spa::utils::Choice::<pw::spa::utils::Fraction>(
-                        pw::spa::utils::ChoiceFlags::empty(),
-                        pw::spa::utils::ChoiceEnum::<pw::spa::utils::Fraction>::Range {
-                            default: pw::spa::utils::Fraction { num: 25, denom: 1 },
-                            min: pw::spa::utils::Fraction { num: 0, denom: 1 },
-                            max: pw::spa::utils::Fraction {
-                                num: 1000,
-                                denom: 1,
-                            },
-                        },
-                    ),
-                )),
-            },
-        ]
-        .to_vec(),
-    };
+            pw::spa::utils::Rectangle {
+                width: 4096,
+                height: 4096
+            }
+        ),
+        pw::spa::pod::property!(
+            pw::spa::format::FormatProperties::VideoFramerate,
+            Choice,
+            Range,
+            Fraction,
+            pw::spa::utils::Fraction { num: 25, denom: 1 },
+            pw::spa::utils::Fraction { num: 0, denom: 1 },
+            pw::spa::utils::Fraction {
+                num: 1000,
+                denom: 1
+            }
+        ),
+    );
     let values = pw::spa::pod::serialize::PodSerializer::serialize(
         std::io::Cursor::new(Vec::new()),
         &pw::spa::pod::Value::Object(obj),
