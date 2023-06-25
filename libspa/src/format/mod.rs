@@ -330,6 +330,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn debug_format() {
         assert_eq!("MediaType::Audio", format!("{:?}", MediaType::Audio));
         assert_eq!("MediaSubtype::Raw", format!("{:?}", MediaSubtype::Raw));
