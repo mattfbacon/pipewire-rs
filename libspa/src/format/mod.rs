@@ -141,7 +141,7 @@ impl MediaSubtype {
         Self::APPLICATION_RANGE.contains(self)
     }
 
-    /// Obtain a [`MediaSubtype`] from a raw `spa_media_type` variant.
+    /// Obtain a [`MediaSubtype`] from a raw `spa_media_subtype` variant.
     pub fn from_raw(raw: spa_sys::spa_media_subtype) -> Self {
         Self(raw)
     }
