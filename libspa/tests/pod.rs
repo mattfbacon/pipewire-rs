@@ -2228,13 +2228,12 @@ fn composite_values() {
 #[test]
 fn audio_info_raw() {
     let id = 1;
-    let position = Some([0; audio::MAX_CHANNELS]);
-    let info = AudioInfoRaw {
-        channels: 1,
-        rate: 44100,
-        format: AudioFormat::S8,
-        position,
-    };
+    let position = [0; audio::MAX_CHANNELS];
+    let mut info = AudioInfoRaw::new();
+    info.set_channels(1);
+    info.set_rate(44100);
+    info.set_format(AudioFormat::S8);
+    info.set_position(position);
 
     let obj_rs = Value::Object(Object {
         type_: spa_sys::SPA_TYPE_OBJECT_Format,
@@ -2247,7 +2246,7 @@ fn audio_info_raw() {
         .into_inner();
 
     let mut vec_c: Vec<u8> = vec![0; vec_rs.len()];
-    let obj_c: spa_sys::spa_audio_info_raw = info.into();
+    let obj_c: spa_sys::spa_audio_info_raw = info.as_raw();
     assert_ne!(
         unsafe { c::build_audio_info_raw(vec_c.as_mut_ptr(), vec_c.len(), id, &obj_c) },
         std::ptr::null()

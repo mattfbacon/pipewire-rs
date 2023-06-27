@@ -68,12 +68,10 @@ pub fn main() -> Result<(), pw::Error> {
         })
         .register()?;
 
-    let audio_info = pw::spa::audio::AudioInfoRaw {
-        channels: DEFAULT_CHANNELS,
-        rate: DEFAULT_RATE,
-        format: pw::spa::audio::AudioFormat::S16_LE,
-        ..Default::default()
-    };
+    let mut audio_info = pw::spa::audio::AudioInfoRaw::new();
+    audio_info.set_format(pw::spa::audio::AudioFormat::S16LE);
+    audio_info.set_rate(DEFAULT_RATE);
+    audio_info.set_channels(DEFAULT_CHANNELS);
 
     let values: Vec<u8> = pw::spa::pod::serialize::PodSerializer::serialize(
         std::io::Cursor::new(Vec::new()),
