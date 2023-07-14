@@ -13,6 +13,8 @@ pub mod serialize;
 use std::{
     ffi::c_void,
     io::{Seek, Write},
+    mem::MaybeUninit,
+    os::fd::RawFd,
 };
 
 use bitflags::bitflags;
@@ -22,6 +24,7 @@ use cookie_factory::{
     sequence::pair,
     GenError,
 };
+use nix::errno::Errno;
 use nom::{
     combinator::map,
     number::{
@@ -42,6 +45,307 @@ use self::deserialize::{
     FdVisitor, FloatVisitor, FractionVisitor, IdVisitor, IntVisitor, LongVisitor, PointerVisitor,
     RectangleVisitor,
 };
+
+/// A transparent wrapper around a `spa_sys::spa_pod`.
+#[repr(transparent)]
+pub struct Pod(spa_sys::spa_pod);
+
+impl Pod {
+    /// # Safety
+    ///
+    /// The provided pointer must point to a valid, well-aligned pod.
+    ///
+    /// The pods allocation must fit the entire size of the pod as indicated
+    /// by the pods header, including header size, body size and any padding.
+    ///
+    /// The provided pod must not be mutated, moved, freed or similar while
+    /// the borrow returned from this function is in use.
+    /// This also means that other nonmutable borrows may be created to this pod,
+    /// but no mutable borrows to this pod may be created until all borrows are dropped.
+    ///
+    /// The returned type has `'static` lifetime.
+    /// It is suggested to shorten the lifetime to whatever is applicable afterwards.
+    pub unsafe fn from_raw(pod: *const spa_sys::spa_pod) -> &'static Self {
+        pod.cast::<Self>().as_ref().unwrap()
+    }
+
+    /// # Safety
+    ///
+    /// The provided pointer must point to a valid, well-aligned pod.
+    ///
+    /// The pods allocation must fit the entire size of the pod as indicated
+    /// by the pods header, including header size, body size and any padding.
+    ///
+    /// The provided pod must not be mutated, moved, freed or similar while
+    /// the borrow returned from this function is in use.
+    /// This also means that no other borrow to this pod may be created until the borrow is dropped.
+    ///
+    /// The returned type has `'static` lifetime.
+    /// It is suggested to shorten the lifetime to whatever is applicable afterwards.
+    pub unsafe fn from_raw_mut(pod: *mut spa_sys::spa_pod) -> &'static mut Self {
+        pod.cast::<Self>().as_mut().unwrap()
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut spa_sys::spa_pod {
+        std::ptr::addr_of!(self.0).cast_mut()
+    }
+
+    // TODO: Other methods from iter.h that are still missing
+
+    pub fn is_none(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_none(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn is_bool(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_bool(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_bool(&self) -> Result<bool, Errno> {
+        unsafe {
+            let mut b: MaybeUninit<bool> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_bool(self.as_raw_ptr(), b.as_mut_ptr());
+
+            if res >= 0 {
+                Ok(b.assume_init())
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_id(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_id(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_id(&self) -> Result<Id, Errno> {
+        unsafe {
+            let mut id: MaybeUninit<u32> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_id(self.as_raw_ptr(), id.as_mut_ptr());
+
+            if res >= 0 {
+                Ok(Id(id.assume_init()))
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_int(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_int(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_int(&self) -> Result<i32, Errno> {
+        unsafe {
+            let mut int: MaybeUninit<i32> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_int(self.as_raw_ptr(), int.as_mut_ptr());
+
+            if res >= 0 {
+                Ok(int.assume_init())
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_long(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_long(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_long(&self) -> Result<i64, Errno> {
+        unsafe {
+            let mut long: MaybeUninit<i64> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_long(self.as_raw_ptr(), long.as_mut_ptr());
+
+            if res >= 0 {
+                Ok(long.assume_init())
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_float(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_float(&self) -> Result<f32, Errno> {
+        unsafe {
+            let mut float: MaybeUninit<f32> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_float(self.as_raw_ptr(), float.as_mut_ptr());
+
+            if res >= 0 {
+                Ok(float.assume_init())
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_double(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_double(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_double(&self) -> Result<f64, Errno> {
+        unsafe {
+            let mut double: MaybeUninit<f64> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_double(self.as_raw_ptr(), double.as_mut_ptr());
+
+            if res >= 0 {
+                Ok(double.assume_init())
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_string(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_string(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    // TODO: to_string
+
+    pub fn is_bytes(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_bytes(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_bytes(&self) -> Result<&[u8], Errno> {
+        unsafe {
+            let mut bytes: MaybeUninit<*const c_void> = MaybeUninit::uninit();
+            let mut len: MaybeUninit<u32> = MaybeUninit::uninit();
+            let res =
+                spa_sys::spa_pod_get_bytes(self.as_raw_ptr(), bytes.as_mut_ptr(), len.as_mut_ptr());
+
+            if res >= 0 {
+                let bytes = bytes.assume_init();
+                let len = len.assume_init();
+                let bytes = std::slice::from_raw_parts(bytes.cast(), len.try_into().unwrap());
+                Ok(bytes)
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_pointer(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_pointer(&self) -> Result<(*const c_void, Id), Errno> {
+        unsafe {
+            let mut _type: MaybeUninit<u32> = MaybeUninit::uninit();
+            let mut pointer: MaybeUninit<*const c_void> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_pointer(
+                self.as_raw_ptr(),
+                _type.as_mut_ptr(),
+                pointer.as_mut_ptr(),
+            );
+
+            if res >= 0 {
+                let _type = Id(_type.assume_init());
+                let pointer = pointer.assume_init();
+                Ok((pointer, _type))
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_fd(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_fd(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_fd(&self) -> Result<RawFd, Errno> {
+        unsafe {
+            let mut fd: MaybeUninit<i64> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_fd(self.as_raw_ptr(), fd.as_mut_ptr());
+
+            if res >= 0 {
+                let fd = fd.assume_init();
+                let fd: RawFd = fd.try_into().unwrap();
+                Ok(fd)
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_rectangle(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_rectangle(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_rectangle(&self) -> Result<Rectangle, Errno> {
+        unsafe {
+            let mut rectangle: MaybeUninit<spa_sys::spa_rectangle> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_rectangle(self.as_raw_ptr(), rectangle.as_mut_ptr());
+
+            if res >= 0 {
+                Ok(rectangle.assume_init())
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_fraction(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_fraction(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn get_fraction(&self) -> Result<Fraction, Errno> {
+        unsafe {
+            let mut fraction: MaybeUninit<spa_sys::spa_fraction> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_get_fraction(self.as_raw_ptr(), fraction.as_mut_ptr());
+
+            if res >= 0 {
+                Ok(fraction.assume_init())
+            } else {
+                Err(Errno::from_i32(-res))
+            }
+        }
+    }
+
+    pub fn is_bitmap(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_bitmap(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn is_array(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_array(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn is_choice(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_choice(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn is_struct(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_struct(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn is_object(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_object(self.as_raw_ptr()) };
+        res != 0
+    }
+
+    pub fn is_sequence(&self) -> bool {
+        let res = unsafe { spa_sys::spa_pod_is_sequence(self.as_raw_ptr()) };
+        res != 0
+    }
+}
 
 /// Implementors of this trait are the canonical representation of a specific type of fixed sized SPA pod.
 ///
