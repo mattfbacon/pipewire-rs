@@ -1,6 +1,8 @@
 use super::*;
 
 mod builder;
-mod parser;
 pub use builder::*;
+mod iter;
+pub use iter::*;
+mod parser;
 pub use parser::*;
