@@ -380,7 +380,7 @@ impl<D> std::fmt::Debug for Stream<D> {
     }
 }
 
-type ParamChangedCB<D> = dyn FnMut(u32, &mut D, *const spa_sys::spa_pod);
+type ParamChangedCB<D> = dyn FnMut(&Stream<D>, u32, &mut D, *const spa_sys::spa_pod);
 type ProcessCB<D> = dyn FnMut(&Stream<D>, &mut D);
 
 pub struct ListenerLocalCallbacks<D> {
@@ -476,7 +476,14 @@ impl<D> ListenerLocalCallbacks<D> {
         ) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.param_changed {
-                    cb(id, &mut state.user_data, param);
+                    let stream = state
+                        .stream
+                        .map(|ptr| Stream {
+                            ptr,
+                            _alive: KeepAlive::Temp,
+                        })
+                        .expect("stream cannot be null");
+                    cb(&stream, id, &mut state.user_data, param);
                 }
             }
         }
@@ -624,7 +631,7 @@ pub trait ListenerBuilderT<D>: Sized {
     /// Set the callback for the `param_changed` event.
     fn param_changed<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(u32, &mut D, *const spa_sys::spa_pod) + 'static,
+        F: FnMut(&Stream<D>, u32, &mut D, *const spa_sys::spa_pod) + 'static,
     {
         self.callbacks().param_changed = Some(Box::new(callback));
         self
