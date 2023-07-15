@@ -5,7 +5,7 @@
 
 use std::{convert::TryInto, fmt};
 
-use errno::Errno;
+use nix::errno::Errno;
 
 /// A result returned by a SPA method, usually to be converted to
 /// a Rust result using [`SpaResult::into_result`] or [`SpaResult::into_async_result`].
@@ -133,7 +133,7 @@ impl Error {
     fn new(e: i32) -> Self {
         assert!(e > 0);
 
-        Self(Errno(e))
+        Self(Errno::from_i32(e))
     }
 }
 
@@ -170,7 +170,7 @@ mod tests {
         );
 
         let err = SpaResult::from_c(-libc::EBUSY).into_result().unwrap_err();
-        assert_eq!(format!("{}", err), "Device or resource busy",);
+        assert_eq!(format!("{}", err), "EBUSY: Device or resource busy",);
 
         let res = SpaResult::from_c(-1).into_sync_result();
         assert!(res.is_err());

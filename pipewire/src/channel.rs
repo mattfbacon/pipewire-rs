@@ -233,7 +233,7 @@ where
         unsafe { eventfd(0, 0x00100000) }
     };
     if eventfd == -1 {
-        panic!("Failed to create eventfd: {}", errno::errno())
+        panic!("Failed to create eventfd: {}", nix::errno::errno())
     }
 
     let channel: Arc<Mutex<Channel<T>>> = Arc::new(Mutex::new(Channel {
