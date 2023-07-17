@@ -527,7 +527,7 @@ key_constant!(VIDEO_FORMAT, PW_KEY_VIDEO_FORMAT,
     /// a video format
 );
 key_constant!(VIDEO_SIZE, PW_KEY_VIDEO_SIZE,
-    /// a video size as "<width>x<height"
+    /// a video size as "\<width\>x\<height\>"
 );
 #[cfg(feature = "v0_3_44")]
 key_constant!(TARGET_OBJECT, PW_KEY_TARGET_OBJECT,
