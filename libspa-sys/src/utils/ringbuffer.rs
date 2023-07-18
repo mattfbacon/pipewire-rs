@@ -1,4 +1,4 @@
-use std::ffi::{c_char, c_double, c_float, c_int, c_void};
+use std::ffi::{c_int, c_void};
 
 use super::*;
 
