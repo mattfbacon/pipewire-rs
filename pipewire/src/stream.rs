@@ -318,12 +318,6 @@ impl<D> Stream<D> {
     // TODO: pw_stream_get_time()
 }
 
-impl<D> Drop for Stream<D> {
-    fn drop(&mut self) {
-        unsafe { pw_sys::pw_stream_destroy(self.as_ptr()) }
-    }
-}
-
 impl<D: Default> Stream<D> {
     /// Create a [`Stream`] and connect its event.
     ///
