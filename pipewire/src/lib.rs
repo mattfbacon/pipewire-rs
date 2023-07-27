@@ -143,8 +143,6 @@ mod utils;
 // can always "use pipewire::prelude::*" without getting conflicts
 pub mod prelude {
     pub use spa::prelude::*;
-
-    pub use crate::stream::ListenerBuilderT;
 }
 
 /// Initialize PipeWire

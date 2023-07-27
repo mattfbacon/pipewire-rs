@@ -6,7 +6,6 @@
 //! tut: https://docs.pipewire.org/page_tutorial5.html
 
 use pipewire as pw;
-use pw::prelude::*;
 use pw::{properties, spa};
 
 use clap::Parser;
@@ -28,84 +27,95 @@ pub fn main() -> Result<(), pw::Error> {
     let opt = Opt::parse();
 
     let mainloop = pw::MainLoop::new()?;
+    let context = pw::Context::new(&mainloop)?;
+    let core = context.connect(None)?;
 
     let data = UserData {
         format: Default::default(),
     };
 
-    let stream = pw::stream::Stream::<UserData>::with_user_data(
-        &mainloop,
+    let stream = pw::stream::Stream::new(
+        &core,
         "video-test",
         properties! {
             *pw::keys::MEDIA_TYPE => "Video",
             *pw::keys::MEDIA_CATEGORY => "Capture",
             *pw::keys::MEDIA_ROLE => "Camera",
         },
+    )?;
+
+    /*let stream = pw::stream::Stream::<UserData>::with_user_data(
+        &mainloop,
+        "video-test",
+        ,
         data,
-    )
-    .state_changed(|old, new| {
-        println!("State changed: {:?} -> {:?}", old, new);
-    })
-    .param_changed(|_, id, user_data, param| {
-        if param.is_null() || id != pw::spa::param::ParamType::Format.as_raw() {
-            return;
-        }
+    )*/
 
-        let (media_type, media_subtype) = unsafe {
-            match pw::spa::param::format_utils::spa_parse_format(param) {
-                Ok(v) => v,
-                Err(_) => return,
+    let _listener = stream
+        .add_local_listener_with_user_data(data)
+        .state_changed(|old, new| {
+            println!("State changed: {:?} -> {:?}", old, new);
+        })
+        .param_changed(|_, id, user_data, param| {
+            if param.is_null() || id != pw::spa::param::ParamType::Format.as_raw() {
+                return;
             }
-        };
 
-        if media_type != pw::spa::format::MediaType::Video
-            || media_subtype != pw::spa::format::MediaSubtype::Raw
-        {
-            return;
-        }
-
-        unsafe {
-            user_data
-                .format
-                .parse(param)
-                .expect("Failed to parse param changed to VideoInfoRaw")
-        };
-
-        println!("got video format:");
-        println!(
-            "  format: {} ({:?})",
-            user_data.format.format().as_raw(),
-            user_data.format.format()
-        );
-        println!(
-            "  size: {}x{}",
-            user_data.format.size().width,
-            user_data.format.size().height
-        );
-        println!(
-            "  framerate: {}/{}",
-            user_data.format.framerate().num,
-            user_data.format.framerate().denom
-        );
-
-        // prepare to render video of this size
-    })
-    .process(|stream, _| {
-        match stream.dequeue_buffer() {
-            None => println!("out of buffers"),
-            Some(mut buffer) => {
-                let datas = buffer.datas_mut();
-                if datas.is_empty() {
-                    return;
+            let (media_type, media_subtype) = unsafe {
+                match pw::spa::param::format_utils::spa_parse_format(param) {
+                    Ok(v) => v,
+                    Err(_) => return,
                 }
+            };
 
-                // copy frame data to screen
-                let data = &mut datas[0];
-                println!("got a frame of size {}", data.chunk().size());
+            if media_type != pw::spa::format::MediaType::Video
+                || media_subtype != pw::spa::format::MediaSubtype::Raw
+            {
+                return;
             }
-        }
-    })
-    .create()?;
+
+            unsafe {
+                user_data
+                    .format
+                    .parse(param)
+                    .expect("Failed to parse param changed to VideoInfoRaw")
+            };
+
+            println!("got video format:");
+            println!(
+                "  format: {} ({:?})",
+                user_data.format.format().as_raw(),
+                user_data.format.format()
+            );
+            println!(
+                "  size: {}x{}",
+                user_data.format.size().width,
+                user_data.format.size().height
+            );
+            println!(
+                "  framerate: {}/{}",
+                user_data.format.framerate().num,
+                user_data.format.framerate().denom
+            );
+
+            // prepare to render video of this size
+        })
+        .process(|stream, _| {
+            match stream.dequeue_buffer() {
+                None => println!("out of buffers"),
+                Some(mut buffer) => {
+                    let datas = buffer.datas_mut();
+                    if datas.is_empty() {
+                        return;
+                    }
+
+                    // copy frame data to screen
+                    let data = &mut datas[0];
+                    println!("got a frame of size {}", data.chunk().size());
+                }
+            }
+        })
+        .register()?;
 
     println!("Created stream {:#?}", stream);
 

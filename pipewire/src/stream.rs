@@ -4,12 +4,12 @@
 //! Pipewire Stream
 
 use crate::buffer::Buffer;
-use crate::{error::Error, Core, MainLoop, Properties, PropertiesRef};
+use crate::{error::Error, Core, Properties, PropertiesRef};
 use bitflags::bitflags;
 use spa::result::SpaResult;
-use std::fmt::Debug;
 use std::{
     ffi::{self, CStr, CString},
+    fmt::Debug,
     mem, os,
     pin::Pin,
     ptr,
@@ -48,27 +48,20 @@ impl StreamState {
 /// level abstraction around nodes in the graph. A stream can be used to send or
 /// receive frames of audio of video data by connecting it to another node.
 /// `D` is the user data, to allow passing extra context to the callbacks.
-pub struct Stream<D> {
+pub struct Stream {
     ptr: ptr::NonNull<pw_sys::pw_stream>,
     // objects that need to stay alive while the Stream is
-    _alive: KeepAlive<D>,
+    _alive: KeepAlive,
 }
 
-enum KeepAlive<D> {
+enum KeepAlive {
     // Stream created with Stream::new()
-    Normal {
-        _core: Core,
-    },
-    // Stream created with Stream::simple()
-    Simple {
-        _events: Pin<Box<pw_sys::pw_stream_events>>,
-        _data: Box<ListenerLocalCallbacks<D>>,
-    },
+    Normal { _core: Core },
     // Temporary stream for callbacks
     Temp,
 }
 
-impl<D> Stream<D> {
+impl Stream {
     /// Create a [`Stream`]
     ///
     /// Initialises a new stream with the given `name` and `properties`.
@@ -86,61 +79,10 @@ impl<D> Stream<D> {
         })
     }
 
-    /// Create a [`Stream`] with custom user data, and connect its event.
-    ///
-    /// Create a stream directly from a [`MainLoop`]. This avoids having to create
-    /// a [`crate::Context`] and [`Core`] yourself in cases that don't require anything
-    /// special.
-    ///
-    /// # Panics
-    /// Will panic if `name` contains a 0 byte.
-    ///
-    /// # Example
-    /// ```no_run
-    /// use pipewire::prelude::*;
-    /// use pipewire::properties;
-    ///
-    /// let mainloop = pipewire::MainLoop::new()?;
-    ///
-    /// let mut stream = pipewire::stream::Stream::<i32>::with_user_data(
-    ///     &mainloop,
-    ///     "video-test",
-    ///     properties! {
-    ///         *pipewire::keys::MEDIA_TYPE => "Video",
-    ///         *pipewire::keys::MEDIA_CATEGORY => "Capture",
-    ///         *pipewire::keys::MEDIA_ROLE => "Camera",
-    ///     },
-    ///     42,
-    /// )
-    /// .state_changed(|old, new| {
-    ///     println!("State changed: {:?} -> {:?}", old, new);
-    /// })
-    /// .process(|_stream, _user_data| {
-    ///     println!("On frame");
-    /// })
-    /// .create()?;
-    /// # Ok::<(), pipewire::Error>(())
-    /// ```
-    pub fn with_user_data<'a>(
-        main_loop: &'a MainLoop,
-        name: &str,
-        properties: Properties,
-        user_data: D,
-    ) -> SimpleLocalBuilder<'a, D> {
-        let name = CString::new(name).expect("Invalid byte in stream name");
-
-        SimpleLocalBuilder::<D> {
-            main_loop,
-            name,
-            properties,
-            callbacks: ListenerLocalCallbacks::with_user_data(user_data),
-        }
-    }
-
     /// Add a local listener builder
     #[must_use = "Fluent builder API"]
-    pub fn add_local_listener_with_user_data(
-        &mut self,
+    pub fn add_local_listener_with_user_data<D>(
+        &self,
         user_data: D,
     ) -> ListenerLocalBuilder<'_, D> {
         let mut callbacks = ListenerLocalCallbacks::with_user_data(user_data);
@@ -149,6 +91,12 @@ impl<D> Stream<D> {
             stream: self,
             callbacks,
         }
+    }
+
+    /// Add a local listener builder. User data is initialized with its default value
+    #[must_use = "Fluent builder API"]
+    pub fn add_local_listener<D: Default>(&self) -> ListenerLocalBuilder<'_, D> {
+        self.add_local_listener_with_user_data(Default::default())
     }
 
     /// Connect the stream
@@ -214,7 +162,7 @@ impl<D> Stream<D> {
         pw_sys::pw_stream_dequeue_buffer(self.as_ptr())
     }
 
-    pub fn dequeue_buffer(&self) -> Option<Buffer<D>> {
+    pub fn dequeue_buffer(&self) -> Option<Buffer> {
         unsafe { Buffer::from_raw(self.dequeue_raw_buffer(), self) }
     }
 
@@ -318,58 +266,7 @@ impl<D> Stream<D> {
     // TODO: pw_stream_get_time()
 }
 
-impl<D: Default> Stream<D> {
-    /// Create a [`Stream`] and connect its event.
-    ///
-    /// Create a stream directly from a [`MainLoop`]. This avoids having to create
-    /// a [`crate::Context`] and [`Core`] yourself in cases that don't require anything
-    /// special.
-    ///
-    /// # Panics
-    /// Will panic if `name` contains a 0 byte.
-    ///
-    /// # Example
-    /// ```no_run
-    /// use pipewire::prelude::*;
-    /// use pipewire::properties;
-    ///
-    /// let mainloop = pipewire::MainLoop::new()?;
-    ///
-    /// let mut stream = pipewire::stream::Stream::<()>::simple(
-    ///     &mainloop,
-    ///     "video-test",
-    ///     properties! {
-    ///         *pipewire::keys::MEDIA_TYPE => "Video",
-    ///         *pipewire::keys::MEDIA_CATEGORY => "Capture",
-    ///         *pipewire::keys::MEDIA_ROLE => "Camera",
-    ///     },
-    /// )
-    /// .state_changed(|old, new| {
-    ///     println!("State changed: {:?} -> {:?}", old, new);
-    /// })
-    /// .process(|_stream, _user_data| {
-    ///     println!("On frame");
-    /// })
-    /// .create()?;
-    /// # Ok::<(), pipewire::Error>(())
-    /// ```
-    #[must_use]
-    pub fn simple<'a>(
-        main_loop: &'a MainLoop,
-        name: &str,
-        properties: Properties,
-    ) -> SimpleLocalBuilder<'a, D> {
-        Self::with_user_data(main_loop, name, properties, Default::default())
-    }
-
-    /// Add a local listener builder
-    #[must_use = "Fluent builder API"]
-    pub fn add_local_listener(&mut self) -> ListenerLocalBuilder<'_, D> {
-        self.add_local_listener_with_user_data(Default::default())
-    }
-}
-
-impl<D> std::fmt::Debug for Stream<D> {
+impl std::fmt::Debug for Stream {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Stream")
             .field("name", &self.name())
@@ -380,8 +277,8 @@ impl<D> std::fmt::Debug for Stream<D> {
     }
 }
 
-type ParamChangedCB<D> = dyn FnMut(&Stream<D>, u32, &mut D, *const spa_sys::spa_pod);
-type ProcessCB<D> = dyn FnMut(&Stream<D>, &mut D);
+type ParamChangedCB<D> = dyn FnMut(&Stream, u32, &mut D, *const spa_sys::spa_pod);
+type ProcessCB<D> = dyn FnMut(&Stream, &mut D);
 
 pub struct ListenerLocalCallbacks<D> {
     pub state_changed: Option<Box<dyn FnMut(StreamState, StreamState)>>,
@@ -598,94 +495,85 @@ impl<D> ListenerLocalCallbacks<D> {
     }
 }
 
-pub trait ListenerBuilderT<D>: Sized {
-    fn callbacks(&mut self) -> &mut ListenerLocalCallbacks<D>;
+#[must_use]
+pub struct ListenerLocalBuilder<'a, D> {
+    stream: &'a Stream,
+    callbacks: ListenerLocalCallbacks<D>,
+}
 
+impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `state_changed` event.
-    fn state_changed<F>(mut self, callback: F) -> Self
+    pub fn state_changed<F>(mut self, callback: F) -> Self
     where
         F: FnMut(StreamState, StreamState) + 'static,
     {
-        self.callbacks().state_changed = Some(Box::new(callback));
+        self.callbacks.state_changed = Some(Box::new(callback));
         self
     }
 
     /// Set the callback for the `control_info` event.
-    fn control_info<F>(mut self, callback: F) -> Self
+    pub fn control_info<F>(mut self, callback: F) -> Self
     where
         F: FnMut(u32, *const pw_sys::pw_stream_control) + 'static,
     {
-        self.callbacks().control_info = Some(Box::new(callback));
+        self.callbacks.control_info = Some(Box::new(callback));
         self
     }
 
     /// Set the callback for the `io_changed` event.
-    fn io_changed<F>(mut self, callback: F) -> Self
+    pub fn io_changed<F>(mut self, callback: F) -> Self
     where
         F: FnMut(u32, *mut os::raw::c_void, u32) + 'static,
     {
-        self.callbacks().io_changed = Some(Box::new(callback));
+        self.callbacks.io_changed = Some(Box::new(callback));
         self
     }
 
     /// Set the callback for the `param_changed` event.
-    fn param_changed<F>(mut self, callback: F) -> Self
+    pub fn param_changed<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Stream<D>, u32, &mut D, *const spa_sys::spa_pod) + 'static,
+        F: FnMut(&Stream, u32, &mut D, *const spa_sys::spa_pod) + 'static,
     {
-        self.callbacks().param_changed = Some(Box::new(callback));
+        self.callbacks.param_changed = Some(Box::new(callback));
         self
     }
 
     /// Set the callback for the `add_buffer` event.
-    fn add_buffer<F>(mut self, callback: F) -> Self
+    pub fn add_buffer<F>(mut self, callback: F) -> Self
     where
         F: FnMut(*mut pw_sys::pw_buffer) + 'static,
     {
-        self.callbacks().add_buffer = Some(Box::new(callback));
+        self.callbacks.add_buffer = Some(Box::new(callback));
         self
     }
 
     /// Set the callback for the `remove_buffer` event.
-    fn remove_buffer<F>(mut self, callback: F) -> Self
+    pub fn remove_buffer<F>(mut self, callback: F) -> Self
     where
         F: FnMut(*mut pw_sys::pw_buffer) + 'static,
     {
-        self.callbacks().remove_buffer = Some(Box::new(callback));
+        self.callbacks.remove_buffer = Some(Box::new(callback));
         self
     }
 
     /// Set the callback for the `process` event.
-    fn process<F>(mut self, callback: F) -> Self
+    pub fn process<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Stream<D>, &mut D) + 'static,
+        F: FnMut(&Stream, &mut D) + 'static,
     {
-        self.callbacks().process = Some(Box::new(callback));
+        self.callbacks.process = Some(Box::new(callback));
         self
     }
 
     /// Set the callback for the `drained` event.
-    fn drained<F>(mut self, callback: F) -> Self
+    pub fn drained<F>(mut self, callback: F) -> Self
     where
         F: FnMut() + 'static,
     {
-        self.callbacks().drained = Some(Box::new(callback));
+        self.callbacks.drained = Some(Box::new(callback));
         self
     }
-}
 
-pub struct ListenerLocalBuilder<'a, D> {
-    stream: &'a mut Stream<D>,
-    callbacks: ListenerLocalCallbacks<D>,
-}
-
-impl<'a, D: Default> ListenerBuilderT<D> for ListenerLocalBuilder<'a, D> {
-    fn callbacks(&mut self) -> &mut ListenerLocalCallbacks<D> {
-        &mut self.callbacks
-    }
-}
-
-impl<'a, D> ListenerLocalBuilder<'a, D> {
     //// Register the Callbacks
     ///
     /// Stop building the listener and register it on the stream. Returns a
@@ -708,47 +596,6 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
             listener,
             _events: events,
             _data: data,
-        })
-    }
-}
-
-pub struct SimpleLocalBuilder<'a, D> {
-    main_loop: &'a MainLoop,
-    name: CString,
-    properties: Properties,
-    callbacks: ListenerLocalCallbacks<D>,
-}
-
-impl<'a, D> ListenerBuilderT<D> for SimpleLocalBuilder<'a, D> {
-    fn callbacks(&mut self) -> &mut ListenerLocalCallbacks<D> {
-        &mut self.callbacks
-    }
-}
-
-impl<'a, D> SimpleLocalBuilder<'a, D> {
-    pub fn create(self) -> Result<Stream<D>, Error> {
-        let (events, data) = self.callbacks.into_raw();
-        let data = Box::into_raw(data);
-        let (stream, mut data) = unsafe {
-            let stream = pw_sys::pw_stream_new_simple(
-                self.main_loop.as_ptr(),
-                self.name.as_ptr(),
-                self.properties.into_raw(),
-                events.as_ref().get_ref(),
-                data as *mut _,
-            );
-            (stream, Box::from_raw(data))
-        };
-        let stream = ptr::NonNull::new(stream).ok_or(Error::CreationFailed)?;
-        data.stream = Some(stream);
-
-        // pw_stream does not keep a pointer on the loop so no need to ensure it stays alive
-        Ok(Stream {
-            ptr: stream,
-            _alive: KeepAlive::Simple {
-                _events: events,
-                _data: data,
-            },
         })
     }
 }
