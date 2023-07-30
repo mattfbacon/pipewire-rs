@@ -81,7 +81,7 @@ impl Node {
                 set_param,
                 id.as_raw(),
                 flags,
-                param.as_ptr() as *const spa::sys::spa_pod
+                param.as_raw_ptr()
             );
         }
     }
@@ -113,7 +113,7 @@ struct ListenerLocalCallbacks {
     #[allow(clippy::type_complexity)]
     info: Option<Box<dyn Fn(&NodeInfo)>>,
     #[allow(clippy::type_complexity)]
-    param: Option<Box<dyn Fn(i32, spa::param::ParamType, u32, u32, &[u8])>>,
+    param: Option<Box<dyn Fn(i32, spa::param::ParamType, u32, u32, Option<&Pod>)>>,
 }
 
 pub struct NodeListenerLocalBuilder<'a> {
@@ -268,7 +268,7 @@ impl<'a> NodeListenerLocalBuilder<'a> {
     #[must_use]
     pub fn param<F>(mut self, param: F) -> Self
     where
-        F: Fn(i32, spa::param::ParamType, u32, u32, &[u8]) + 'static,
+        F: Fn(i32, spa::param::ParamType, u32, u32, Option<&Pod>) + 'static,
     {
         self.cbs.param = Some(Box::new(param));
         self
@@ -297,17 +297,13 @@ impl<'a> NodeListenerLocalBuilder<'a> {
             let callbacks = (data as *mut ListenerLocalCallbacks).as_ref().unwrap();
 
             let id = spa::param::ParamType::from_raw(id);
-            let param_slice = if !param.is_null() {
-                std::slice::from_raw_parts(
-                    param as *const u8,
-                    (*param).size as usize + 2 * std::mem::size_of::<u32>(),
-                )
+            let param = if !param.is_null() {
+                unsafe { Some(Pod::from_raw(param)) }
             } else {
-                &[]
+                None
             };
 
-            // FIXME: Is the lifetime of the param slice unbounded? We need to make sure it can only stay alive for the duration of this function call.
-            callbacks.param.as_ref().unwrap()(seq, id, index, next, param_slice);
+            callbacks.param.as_ref().unwrap()(seq, id, index, next, param);
         }
 
         let e = unsafe {

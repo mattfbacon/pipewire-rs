@@ -371,16 +371,8 @@ impl VideoInfoRaw {
     }
 
     /// helper function to parse format properties type
-    ///
-    /// # Safety
-    ///
-    /// `format` is not validated to be a valid SPA Pod, which may lead to undefined behaviour.
-    pub unsafe fn parse(&mut self, format: *const spa_sys::spa_pod) -> Result<SpaSuccess, Error> {
-        if format.is_null() {
-            return Err(SpaResult::from_c(-libc::EINVAL).into_result().unwrap_err());
-        }
-
-        let res = spa_sys::spa_format_video_raw_parse(format.cast_mut(), &mut self.0);
+    pub fn parse(&mut self, format: &crate::pod::Pod) -> Result<SpaSuccess, Error> {
+        let res = unsafe { spa_sys::spa_format_video_raw_parse(format.as_raw_ptr(), &mut self.0) };
         SpaResult::from_c(res).into_result()
     }
 

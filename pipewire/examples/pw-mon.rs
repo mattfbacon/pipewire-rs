@@ -4,6 +4,7 @@
 use anyhow::Result;
 use clap::Parser;
 use pipewire as pw;
+use spa::pod::Pod;
 use std::{cell::RefCell, collections::HashMap};
 use std::{rc::Rc, sync::Arc};
 
@@ -115,7 +116,7 @@ fn monitor(remote: Option<String>) -> Result<()> {
                                 dbg!(info);
                             })
                             .param(|seq, id, index, next, param| {
-                                dbg!((seq, id, index, next, param));
+                                dbg!((seq, id, index, next, param.map(Pod::as_bytes)));
                             })
                             .register();
 
@@ -129,7 +130,7 @@ fn monitor(remote: Option<String>) -> Result<()> {
                                 dbg!(info);
                             })
                             .param(|seq, id, index, next, param| {
-                                dbg!((seq, id, index, next, param));
+                                dbg!((seq, id, index, next, param.map(Pod::as_bytes)));
                             })
                             .register();
 

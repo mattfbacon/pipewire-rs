@@ -1,30 +1,34 @@
 // Copyright The pipewire-rs Contributors.
 // SPDX-License-Identifier: MIT
 
-use crate::format::{MediaSubtype, MediaType};
-use crate::{Error, SpaResult};
+use std::mem::MaybeUninit;
+
+use crate::{
+    format::{MediaSubtype, MediaType},
+    pod::Pod,
+    Error, SpaResult,
+};
 
 /// helper function to parse format properties type
-///
-/// # Safety
-///
-/// `format` is not validated to be a valid SPA Pod, which may lead to undefined behaviour.
-pub unsafe fn spa_parse_format(
-    format: *const spa_sys::spa_pod,
-) -> Result<(MediaType, MediaSubtype), Error> {
-    let mut media_type: u32 = 0;
-    let mut media_subtype: u32 = 0;
+pub fn parse_format(format: &Pod) -> Result<(MediaType, MediaSubtype), Error> {
+    let mut media_type: MaybeUninit<u32> = MaybeUninit::uninit();
+    let mut media_subtype: MaybeUninit<u32> = MaybeUninit::uninit();
 
-    if format.is_null() {
-        return Err(SpaResult::from_c(-libc::EINVAL).into_result().unwrap_err());
-    }
+    let res = unsafe {
+        spa_sys::spa_format_parse(
+            format.as_raw_ptr(),
+            media_type.as_mut_ptr(),
+            media_subtype.as_mut_ptr(),
+        )
+    };
 
-    let res = spa_sys::spa_format_parse(format.cast_mut(), &mut media_type, &mut media_subtype);
     match SpaResult::from_c(res).into_sync_result() {
         Err(e) => Err(e),
-        Ok(_) => Ok((
-            MediaType::from_raw(media_type),
-            MediaSubtype::from_raw(media_subtype),
-        )),
+        Ok(_) => Ok(unsafe {
+            (
+                MediaType::from_raw(media_type.assume_init()),
+                MediaSubtype::from_raw(media_subtype.assume_init()),
+            )
+        }),
     }
 }

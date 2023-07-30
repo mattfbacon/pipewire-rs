@@ -9,6 +9,7 @@ use pipewire as pw;
 use pw::{properties, spa};
 
 use clap::Parser;
+use spa::pod::Pod;
 
 struct UserData {
     format: spa::param::video::VideoInfoRaw,
@@ -57,16 +58,18 @@ pub fn main() -> Result<(), pw::Error> {
             println!("State changed: {:?} -> {:?}", old, new);
         })
         .param_changed(|_, id, user_data, param| {
-            if param.is_null() || id != pw::spa::param::ParamType::Format.as_raw() {
+            let Some(param) = param else {
+                return;
+            };
+            if id != pw::spa::param::ParamType::Format.as_raw() {
                 return;
             }
 
-            let (media_type, media_subtype) = unsafe {
-                match pw::spa::param::format_utils::spa_parse_format(param) {
+            let (media_type, media_subtype) =
+                match pw::spa::param::format_utils::parse_format(param) {
                     Ok(v) => v,
                     Err(_) => return,
-                }
-            };
+                };
 
             if media_type != pw::spa::format::MediaType::Video
                 || media_subtype != pw::spa::format::MediaSubtype::Raw
@@ -74,12 +77,10 @@ pub fn main() -> Result<(), pw::Error> {
                 return;
             }
 
-            unsafe {
-                user_data
-                    .format
-                    .parse(param)
-                    .expect("Failed to parse param changed to VideoInfoRaw")
-            };
+            user_data
+                .format
+                .parse(param)
+                .expect("Failed to parse param changed to VideoInfoRaw");
 
             println!("got video format:");
             println!(
@@ -176,7 +177,7 @@ pub fn main() -> Result<(), pw::Error> {
             }
         ),
     );
-    let values = pw::spa::pod::serialize::PodSerializer::serialize(
+    let values: Vec<u8> = pw::spa::pod::serialize::PodSerializer::serialize(
         std::io::Cursor::new(Vec::new()),
         &pw::spa::pod::Value::Object(obj),
     )
@@ -184,7 +185,7 @@ pub fn main() -> Result<(), pw::Error> {
     .0
     .into_inner();
 
-    let mut params = [values.as_ptr() as *const spa_sys::spa_pod];
+    let mut params = [Pod::from_bytes(&values).unwrap()];
 
     stream.connect(
         spa::Direction::Input,

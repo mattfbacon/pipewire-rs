@@ -109,7 +109,7 @@ impl Stream {
         direction: spa::Direction,
         id: Option<u32>,
         flags: StreamFlags,
-        params: &mut [*const spa_sys::spa_pod],
+        params: &mut [&spa::pod::Pod],
     ) -> Result<(), Error> {
         let r = unsafe {
             pw_sys::pw_stream_connect(
@@ -117,7 +117,9 @@ impl Stream {
                 direction.as_raw(),
                 id.unwrap_or(crate::constants::ID_ANY),
                 flags.bits(),
-                params.as_mut_ptr(),
+                // We cast from *mut [&spa::pod::Pod] to *mut [*const spa_sys::spa_pod] here,
+                // which is valid because spa::pod::Pod is a transparent wrapper around spa_sys::spa_pod
+                params.as_mut_ptr().cast(),
                 params.len() as u32,
             )
         };
@@ -277,7 +279,7 @@ impl std::fmt::Debug for Stream {
     }
 }
 
-type ParamChangedCB<D> = dyn FnMut(&Stream, u32, &mut D, *const spa_sys::spa_pod);
+type ParamChangedCB<D> = dyn FnMut(&Stream, u32, &mut D, Option<&spa::pod::Pod>);
 type ProcessCB<D> = dyn FnMut(&Stream, &mut D);
 
 pub struct ListenerLocalCallbacks<D> {
@@ -380,6 +382,13 @@ impl<D> ListenerLocalCallbacks<D> {
                             _alive: KeepAlive::Temp,
                         })
                         .expect("stream cannot be null");
+
+                    let param = if !param.is_null() {
+                        Some(spa::pod::Pod::from_raw(param))
+                    } else {
+                        None
+                    };
+
                     cb(&stream, id, &mut state.user_data, param);
                 }
             }
@@ -532,7 +541,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `param_changed` event.
     pub fn param_changed<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Stream, u32, &mut D, *const spa_sys::spa_pod) + 'static,
+        F: FnMut(&Stream, u32, &mut D, Option<&spa::pod::Pod>) + 'static,
     {
         self.callbacks.param_changed = Some(Box::new(callback));
         self
