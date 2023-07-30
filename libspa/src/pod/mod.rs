@@ -38,7 +38,7 @@ use nom::{
 use deserialize::{BoolVisitor, NoneVisitor, PodDeserialize, PodDeserializer};
 use serialize::{PodSerialize, PodSerializer};
 
-use crate::utils::{Choice, Fd, Fraction, Id, Rectangle};
+use crate::utils::{Choice, Fd, Fraction, Id, Rectangle, SpaTypes};
 
 use self::deserialize::{
     ChoiceDoubleVisitor, ChoiceFdVisitor, ChoiceFloatVisitor, ChoiceFractionVisitor,
@@ -89,6 +89,52 @@ impl Pod {
 
     pub fn as_raw_ptr(&self) -> *mut spa_sys::spa_pod {
         std::ptr::addr_of!(self.0).cast_mut()
+    }
+
+    /// Construct a pod from raw bytes.
+    ///
+    /// The provided slice must be big enough to fit the entire pod including padding.
+    pub fn from_bytes(bytes: &[u8]) -> Option<&Self> {
+        // Ensure bytes contains at least a readable pod header
+        // that we can read the pods size from
+
+        const HEADER_SIZE: usize = std::mem::size_of::<spa_sys::spa_pod>();
+
+        if bytes.len() < HEADER_SIZE {
+            return None;
+        }
+
+        let pod: *const spa_sys::spa_pod = bytes.as_ptr().cast();
+
+        // `pod` now points to a valid pod header that we can read
+        let size: usize = unsafe { *pod }.size.try_into().unwrap();
+
+        let padding = 8 - (size % 8) % 8;
+
+        // Now, ensure that `bytes` is big enough to fit the entire pod
+        if HEADER_SIZE + size + padding <= bytes.len() {
+            // Bytes is big enough to fit the entire header, body and padding.
+            // We can safely convert this to a &Pod
+            Some(unsafe { Self::from_raw(pod) })
+        } else {
+            None
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        let ptr: *const u8 = self.as_raw_ptr().cast();
+        let size: usize = self.size().try_into().unwrap();
+        let size = size + std::mem::size_of::<spa_sys::spa_pod>();
+
+        unsafe { std::slice::from_raw_parts(ptr, size) }
+    }
+
+    pub fn type_(&self) -> SpaTypes {
+        SpaTypes::from_raw(self.0.type_)
+    }
+
+    pub fn size(&self) -> u32 {
+        self.0.size
     }
 
     // TODO: Other methods from iter.h that are still missing

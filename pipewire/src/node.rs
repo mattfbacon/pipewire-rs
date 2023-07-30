@@ -11,8 +11,7 @@ use crate::{
     proxy::{Listener, Proxy, ProxyT},
     types::ObjectType,
 };
-use spa::dict::ForeignDict;
-use spa::spa_interface_call_method;
+use spa::{dict::ForeignDict, pod::Pod, spa_interface_call_method};
 
 #[derive(Debug)]
 pub struct Node {
@@ -74,7 +73,7 @@ impl Node {
         }
     }
 
-    pub fn set_param(&self, id: spa::param::ParamType, flags: u32, param: &[u8]) {
+    pub fn set_param(&self, id: spa::param::ParamType, flags: u32, param: &Pod) {
         unsafe {
             spa_interface_call_method!(
                 self.proxy.as_ptr(),
