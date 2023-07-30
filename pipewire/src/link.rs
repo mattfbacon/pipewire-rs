@@ -191,7 +191,17 @@ impl LinkInfo {
         LinkChangeMask::from_bits_retain(mask)
     }
 
-    // TODO: format (requires SPA Pod support before it can be implemented)
+    pub fn format(&self) -> Option<&spa::pod::Pod> {
+        unsafe {
+            let format = self.ptr.as_ref().format;
+
+            if format.is_null() {
+                None
+            } else {
+                Some(spa::pod::Pod::from_raw(format))
+            }
+        }
+    }
 
     pub fn props(&self) -> Option<&ForeignDict> {
         self.props.as_ref()
