@@ -1,4 +1,4 @@
-use super::stream::Stream;
+use super::stream::StreamRef;
 
 use spa::data::Data;
 use std::convert::TryFrom;
@@ -9,13 +9,13 @@ pub struct Buffer<'s> {
 
     /// In Pipewire, buffers are owned by the stream that generated them.
     /// This reference ensures that this rule is respected.
-    stream: &'s Stream,
+    stream: &'s StreamRef,
 }
 
 impl Buffer<'_> {
     pub(crate) unsafe fn from_raw(
         buf: *mut pw_sys::pw_buffer,
-        stream: &Stream,
+        stream: &StreamRef,
     ) -> Option<Buffer<'_>> {
         NonNull::new(buf).map(|buf| Buffer { buf, stream })
     }

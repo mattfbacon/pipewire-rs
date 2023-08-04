@@ -51,14 +51,7 @@ impl StreamState {
 pub struct Stream {
     ptr: ptr::NonNull<pw_sys::pw_stream>,
     // objects that need to stay alive while the Stream is
-    _alive: KeepAlive,
-}
-
-enum KeepAlive {
-    // Stream created with Stream::new()
-    Normal { _core: Core },
-    // Temporary stream for callbacks
-    Temp,
+    _core: Core,
 }
 
 impl Stream {
@@ -73,10 +66,59 @@ impl Stream {
 
         Ok(Stream {
             ptr: stream,
-            _alive: KeepAlive::Normal {
-                _core: core.clone(),
-            },
+            _core: core.clone(),
         })
+    }
+
+    pub fn into_raw(self) -> *mut pw_sys::pw_stream {
+        let mut this = std::mem::ManuallyDrop::new(self);
+
+        // FIXME: self needs to be wrapped in ManuallyDrop so the raw stream
+        //        isn't destroyed. However, the core should still be dropped.
+        //        Is there a cleaner and safer way to drop the core than like this?
+        unsafe {
+            ptr::drop_in_place(ptr::addr_of_mut!(this._core));
+        }
+
+        this.ptr.as_ptr()
+    }
+}
+
+impl std::ops::Deref for Stream {
+    type Target = StreamRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.cast().as_ref() }
+    }
+}
+
+impl std::fmt::Debug for Stream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Stream")
+            .field("name", &self.name())
+            .field("state", &self.state())
+            .field("node-id", &self.node_id())
+            .field("properties", &self.properties())
+            .finish()
+    }
+}
+
+impl std::ops::Drop for Stream {
+    fn drop(&mut self) {
+        unsafe { pw_sys::pw_stream_destroy(self.as_raw_ptr()) }
+    }
+}
+
+#[repr(transparent)]
+pub struct StreamRef(pw_sys::pw_stream);
+
+impl StreamRef {
+    pub fn as_raw(&self) -> &pw_sys::pw_stream {
+        &self.0
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_stream {
+        ptr::addr_of!(self.0).cast_mut()
     }
 
     /// Add a local listener builder
@@ -86,7 +128,8 @@ impl Stream {
         user_data: D,
     ) -> ListenerLocalBuilder<'_, D> {
         let mut callbacks = ListenerLocalCallbacks::with_user_data(user_data);
-        callbacks.stream = Some(self.ptr);
+        callbacks.stream =
+            Some(ptr::NonNull::new(self.as_raw_ptr()).expect("Pointer should be nonnull"));
         ListenerLocalBuilder {
             stream: self,
             callbacks,
@@ -113,7 +156,7 @@ impl Stream {
     ) -> Result<(), Error> {
         let r = unsafe {
             pw_sys::pw_stream_connect(
-                self.as_ptr(),
+                self.as_raw_ptr(),
                 direction.as_raw(),
                 id.unwrap_or(crate::constants::ID_ANY),
                 flags.bits(),
@@ -135,7 +178,11 @@ impl Stream {
     // FIXME: high-level API for params
     pub fn update_params(&self, params: &mut [*const spa_sys::spa_pod]) -> Result<(), Error> {
         let r = unsafe {
-            pw_sys::pw_stream_update_params(self.as_ptr(), params.as_mut_ptr(), params.len() as u32)
+            pw_sys::pw_stream_update_params(
+                self.as_raw_ptr(),
+                params.as_mut_ptr(),
+                params.len() as u32,
+            )
         };
 
         SpaResult::from_c(r).into_sync_result()?;
@@ -144,7 +191,7 @@ impl Stream {
 
     /// Activate or deactivate the stream
     pub fn set_active(&self, active: bool) -> Result<(), Error> {
-        let r = unsafe { pw_sys::pw_stream_set_active(self.as_ptr(), active) };
+        let r = unsafe { pw_sys::pw_stream_set_active(self.as_raw_ptr(), active) };
 
         SpaResult::from_c(r).into_sync_result()?;
         Ok(())
@@ -161,7 +208,7 @@ impl Stream {
     /// The pointer returned could be NULL if no buffer is available. The buffer
     /// should be returned to the stream once processing is complete.
     pub unsafe fn dequeue_raw_buffer(&self) -> *mut pw_sys::pw_buffer {
-        pw_sys::pw_stream_dequeue_buffer(self.as_ptr())
+        pw_sys::pw_stream_dequeue_buffer(self.as_raw_ptr())
     }
 
     pub fn dequeue_buffer(&self) -> Option<Buffer> {
@@ -177,18 +224,14 @@ impl Stream {
     /// # Safety
     ///
     /// The buffer pointer should be one obtained from this stream instance by
-    /// a call to [Stream::dequeue_raw_buffer()].
+    /// a call to [StreamRef::dequeue_raw_buffer()].
     pub unsafe fn queue_raw_buffer(&self, buffer: *mut pw_sys::pw_buffer) {
-        pw_sys::pw_stream_queue_buffer(self.as_ptr(), buffer);
-    }
-
-    fn as_ptr(&self) -> *mut pw_sys::pw_stream {
-        self.ptr.as_ptr()
+        pw_sys::pw_stream_queue_buffer(self.as_raw_ptr(), buffer);
     }
 
     /// Disconnect the stream
     pub fn disconnect(&self) -> Result<(), Error> {
-        let r = unsafe { pw_sys::pw_stream_disconnect(self.as_ptr()) };
+        let r = unsafe { pw_sys::pw_stream_disconnect(self.as_raw_ptr()) };
 
         SpaResult::from_c(r).into_sync_result()?;
         Ok(())
@@ -202,14 +245,14 @@ impl Stream {
     pub fn set_error(&mut self, res: i32, error: &str) {
         let error = CString::new(error).expect("failed to convert error to CString");
         unsafe {
-            pw_sys::pw_stream_set_error(self.as_ptr(), res, error.as_c_str().as_ptr());
+            pw_sys::pw_stream_set_error(self.as_raw_ptr(), res, error.as_c_str().as_ptr());
         }
     }
 
     /// Flush the stream. When  `drain` is `true`, the `drained` callback will
     /// be called when all data is played or recorded.
     pub fn flush(&self, drain: bool) -> Result<(), Error> {
-        let r = unsafe { pw_sys::pw_stream_flush(self.as_ptr(), drain) };
+        let r = unsafe { pw_sys::pw_stream_flush(self.as_raw_ptr(), drain) };
 
         SpaResult::from_c(r).into_sync_result()?;
         Ok(())
@@ -222,7 +265,7 @@ impl Stream {
     /// Get the name of the stream.
     pub fn name(&self) -> String {
         let name = unsafe {
-            let name = pw_sys::pw_stream_get_name(self.as_ptr());
+            let name = pw_sys::pw_stream_get_name(self.as_raw_ptr());
             CStr::from_ptr(name)
         };
 
@@ -232,15 +275,16 @@ impl Stream {
     /// Get the current state of the stream.
     pub fn state(&self) -> StreamState {
         let mut error: *const std::os::raw::c_char = ptr::null();
-        let state =
-            unsafe { pw_sys::pw_stream_get_state(self.as_ptr(), (&mut error) as *mut *const _) };
+        let state = unsafe {
+            pw_sys::pw_stream_get_state(self.as_raw_ptr(), (&mut error) as *mut *const _)
+        };
         StreamState::from_raw(state, error)
     }
 
     /// Get the properties of the stream.
     pub fn properties(&self) -> PropertiesRef<'_> {
         unsafe {
-            let props = pw_sys::pw_stream_get_properties(self.as_ptr());
+            let props = pw_sys::pw_stream_get_properties(self.as_raw_ptr());
             let props = ptr::NonNull::new(props as *mut _).expect("stream properties is NULL");
             PropertiesRef::from_ptr(props)
         }
@@ -248,17 +292,17 @@ impl Stream {
 
     /// Get the node ID of the stream.
     pub fn node_id(&self) -> u32 {
-        unsafe { pw_sys::pw_stream_get_node_id(self.as_ptr()) }
+        unsafe { pw_sys::pw_stream_get_node_id(self.as_raw_ptr()) }
     }
 
     #[cfg(feature = "v0_3_34")]
     pub fn is_driving(&self) -> bool {
-        unsafe { pw_sys::pw_stream_is_driving(self.as_ptr()) }
+        unsafe { pw_sys::pw_stream_is_driving(self.as_raw_ptr()) }
     }
 
     #[cfg(feature = "v0_3_34")]
     pub fn trigger_process(&self) -> Result<(), Error> {
-        let r = unsafe { pw_sys::pw_stream_trigger_process(self.as_ptr()) };
+        let r = unsafe { pw_sys::pw_stream_trigger_process(self.as_raw_ptr()) };
 
         SpaResult::from_c(r).into_result()?;
         Ok(())
@@ -268,19 +312,8 @@ impl Stream {
     // TODO: pw_stream_get_time()
 }
 
-impl std::fmt::Debug for Stream {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Stream")
-            .field("name", &self.name())
-            .field("state", &self.state())
-            .field("node-id", &self.node_id())
-            .field("properties", &self.properties())
-            .finish()
-    }
-}
-
-type ParamChangedCB<D> = dyn FnMut(&Stream, u32, &mut D, Option<&spa::pod::Pod>);
-type ProcessCB<D> = dyn FnMut(&Stream, &mut D);
+type ParamChangedCB<D> = dyn FnMut(&StreamRef, u32, &mut D, Option<&spa::pod::Pod>);
+type ProcessCB<D> = dyn FnMut(&StreamRef, &mut D);
 
 pub struct ListenerLocalCallbacks<D> {
     pub state_changed: Option<Box<dyn FnMut(StreamState, StreamState)>>,
@@ -377,10 +410,7 @@ impl<D> ListenerLocalCallbacks<D> {
                 if let Some(cb) = &mut state.param_changed {
                     let stream = state
                         .stream
-                        .map(|ptr| Stream {
-                            ptr,
-                            _alive: KeepAlive::Temp,
-                        })
+                        .map(|ptr| ptr.cast::<StreamRef>().as_ref())
                         .expect("stream cannot be null");
 
                     let param = if !param.is_null() {
@@ -389,7 +419,7 @@ impl<D> ListenerLocalCallbacks<D> {
                         None
                     };
 
-                    cb(&stream, id, &mut state.user_data, param);
+                    cb(stream, id, &mut state.user_data, param);
                 }
             }
         }
@@ -421,12 +451,9 @@ impl<D> ListenerLocalCallbacks<D> {
                 if let Some(cb) = &mut state.process {
                     let stream = state
                         .stream
-                        .map(|ptr| Stream {
-                            ptr,
-                            _alive: KeepAlive::Temp,
-                        })
+                        .map(|ptr| ptr.cast::<StreamRef>().as_ref())
                         .expect("stream cannot be null");
-                    cb(&stream, &mut state.user_data);
+                    cb(stream, &mut state.user_data);
                 }
             }
         }
@@ -506,7 +533,7 @@ impl<D> ListenerLocalCallbacks<D> {
 
 #[must_use]
 pub struct ListenerLocalBuilder<'a, D> {
-    stream: &'a Stream,
+    stream: &'a StreamRef,
     callbacks: ListenerLocalCallbacks<D>,
 }
 
@@ -541,7 +568,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `param_changed` event.
     pub fn param_changed<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Stream, u32, &mut D, Option<&spa::pod::Pod>) + 'static,
+        F: FnMut(&StreamRef, u32, &mut D, Option<&spa::pod::Pod>) + 'static,
     {
         self.callbacks.param_changed = Some(Box::new(callback));
         self
@@ -568,7 +595,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `process` event.
     pub fn process<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Stream, &mut D) + 'static,
+        F: FnMut(&StreamRef, &mut D) + 'static,
     {
         self.callbacks.process = Some(Box::new(callback));
         self
@@ -594,7 +621,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
             let raw_listener = Box::into_raw(listener);
             let raw_data = Box::into_raw(data);
             pw_sys::pw_stream_add_listener(
-                self.stream.as_ptr(),
+                self.stream.as_raw_ptr(),
                 raw_listener,
                 events.as_ref().get_ref(),
                 raw_data as *mut _,
