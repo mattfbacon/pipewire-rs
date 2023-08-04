@@ -140,6 +140,12 @@ impl WritableDict for Properties {
     }
 }
 
+impl Default for Properties {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Clone for Properties {
     fn clone(&self) -> Self {
         unsafe {
