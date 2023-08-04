@@ -53,7 +53,7 @@ impl FooRef {
     }
 
     pub fn as_raw_ptr(&self) -> *mut sys::foo {
-        &self.0 as *const _ as *mut _
+        std::ptr::addr_of!(self.0).cast_mut()
     }
 
     // Methods on the C type that do require ownership are bound here
