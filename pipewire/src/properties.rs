@@ -66,6 +66,16 @@ macro_rules! properties {
 }
 
 impl Properties {
+    /// Create a new, initally empty `Properties` struct.
+    pub fn new() -> Self {
+        unsafe {
+            let raw = std::ptr::NonNull::new(pw_sys::pw_properties_new(std::ptr::null()))
+                .expect("Newly created pw_properties should not be null");
+
+            Self::from_ptr(raw)
+        }
+    }
+
     /// Create a `Properties` struct from an existing raw `pw_properties` pointer.
     ///
     /// # Safety
