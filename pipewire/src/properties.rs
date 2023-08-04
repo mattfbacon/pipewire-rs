@@ -119,13 +119,13 @@ impl ReadableDict for Properties {
 }
 
 impl WritableDict for Properties {
-    fn insert<T: Into<Vec<u8>>>(&mut self, key: T, value: T) {
+    fn insert<K: Into<Vec<u8>>, V: Into<Vec<u8>>>(&mut self, key: K, value: V) {
         let k = CString::new(key).unwrap();
         let v = CString::new(value).unwrap();
         unsafe { pw_sys::pw_properties_set(self.as_ptr(), k.as_ptr(), v.as_ptr()) };
     }
 
-    fn remove<T: Into<Vec<u8>>>(&mut self, key: T) {
+    fn remove<K: Into<Vec<u8>>>(&mut self, key: K) {
         let key = CString::new(key).unwrap();
         unsafe { pw_sys::pw_properties_set(self.as_ptr(), key.as_ptr(), std::ptr::null()) };
     }

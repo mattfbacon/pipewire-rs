@@ -219,10 +219,10 @@ impl<T> ParsableValue for *const T {
 /// Trait providing API to modify dictionaries.
 pub trait WritableDict {
     /// Insert the key-value pair, overwriting any old value.
-    fn insert<T: Into<Vec<u8>>>(&mut self, key: T, value: T);
+    fn insert<K: Into<Vec<u8>>, V: Into<Vec<u8>>>(&mut self, key: K, value: V);
 
     /// Remove the key-value pair if it exists.
-    fn remove<T: Into<Vec<u8>>>(&mut self, key: T);
+    fn remove<K: Into<Vec<u8>>>(&mut self, key: K);
 
     /// Clear the object, removing all key-value pairs.
     fn clear(&mut self);
