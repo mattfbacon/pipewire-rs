@@ -52,16 +52,11 @@ pub struct Properties {
 #[macro_export]
 macro_rules! properties {
     {$($k:expr => $v:expr),+ $(,)?} => {{
-        unsafe {
-            $crate::Properties::from_ptr(std::ptr::NonNull::new_unchecked($crate::sys::pw_properties_new(
-                $(
-                    std::ffi::CString::new($k).unwrap().as_ptr(),
-                    std::ffi::CString::new($v).unwrap().as_ptr()
-                ),+,
-                std::ptr::null::<std::os::raw::c_char>()
-            ))
-        )
-        }
+        let mut properties = $crate::Properties::new();
+        $(
+            <$crate::Properties as $crate::spa::WritableDict>::insert(&mut properties, $k, $v);
+        )*
+        properties
     }};
 }
 
