@@ -109,7 +109,7 @@ impl Pod {
         // `pod` now points to a valid pod header that we can read
         let size: usize = unsafe { *pod }.size.try_into().unwrap();
 
-        let padding = 8 - (size % 8) % 8;
+        let padding = (8 - (size % 8)) % 8;
 
         // Now, ensure that `bytes` is big enough to fit the entire pod
         if HEADER_SIZE + size + padding <= bytes.len() {
