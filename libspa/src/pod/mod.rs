@@ -7,6 +7,7 @@
 //! The entire serialization and deserialization approach is inspired by and similar to the excellent `serde` crate,
 //! but is much more specialized to fit the SPA pod format.
 
+pub mod builder;
 pub mod deserialize;
 pub mod parser;
 pub mod serialize;
