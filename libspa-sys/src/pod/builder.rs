@@ -23,13 +23,13 @@ extern "C" {
     pub fn spa_pod_builder_init(builder: *mut spa_pod_builder, data: *mut c_void, size: u32);
 
     #[link_name = "libspa_rs_pod_builder_deref"]
-    pub fn spa_pod_builder_deref(builder: *mut spa_pod_builder, offset: u32) -> spa_pod;
+    pub fn spa_pod_builder_deref(builder: *mut spa_pod_builder, offset: u32) -> *mut spa_pod;
 
     #[link_name = "libspa_rs_pod_builder_frame"]
     pub fn spa_pod_builder_frame(
         builder: *mut spa_pod_builder,
         frame: *mut spa_pod_frame,
-    ) -> spa_pod;
+    ) -> *mut spa_pod;
 
     #[link_name = "libspa_rs_pod_builder_push"]
     pub fn spa_pod_builder_push(
