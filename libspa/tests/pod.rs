@@ -2226,6 +2226,7 @@ fn composite_values() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn audio_info_raw() {
     let id = 1;
     let position = [0; audio::MAX_CHANNELS];
