@@ -180,7 +180,5 @@ pub fn main() -> Result<(), pw::Error> {
     // and wait while we let things run
     mainloop.run();
 
-    unsafe { pw::deinit() };
-
     Ok(())
 }

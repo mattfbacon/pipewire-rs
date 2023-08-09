@@ -98,7 +98,5 @@ pub fn main() -> Result<(), pw::Error> {
 
     mainloop.run();
 
-    unsafe { pw::deinit() };
-
     Ok(())
 }
