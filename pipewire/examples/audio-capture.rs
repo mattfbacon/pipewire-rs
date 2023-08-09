@@ -11,6 +11,7 @@ use pw::{properties, spa};
 use spa::format::{MediaSubtype, MediaType};
 use spa::param::format_utils;
 use spa::pod::Pod;
+#[cfg(feature = "v0_3_44")]
 use spa::WritableDict;
 use std::convert::TryInto;
 use std::mem;
@@ -29,8 +30,6 @@ struct Opt {
 
 pub fn main() -> Result<(), pw::Error> {
     pw::init();
-
-    let opt = Opt::parse();
 
     let mainloop = pw::MainLoop::new()?;
     let context = pw::Context::new(&mainloop)?;
@@ -52,15 +51,26 @@ pub fn main() -> Result<(), pw::Error> {
      * you need to listen to is the process event where you need to produce
      * the data.
      */
-    let mut props = properties! {
+    #[cfg(not(feature = "v0_3_44"))]
+    let props = properties! {
         *pw::keys::MEDIA_TYPE => "Audio",
         *pw::keys::MEDIA_CATEGORY => "Capture",
         *pw::keys::MEDIA_ROLE => "Music",
     };
     #[cfg(feature = "v0_3_44")]
-    if let Some(target) = opt.target {
-        props.insert(*pw::keys::TARGET_OBJECT, target);
-    }
+    let props = {
+        let opt = Opt::parse();
+
+        let mut props = properties! {
+            *pw::keys::MEDIA_TYPE => "Audio",
+            *pw::keys::MEDIA_CATEGORY => "Capture",
+            *pw::keys::MEDIA_ROLE => "Music",
+        };
+        if let Some(target) = opt.target {
+            props.insert(*pw::keys::TARGET_OBJECT, target);
+        }
+        props
+    };
 
     // uncomment if you want to capture from the sink monitor ports
     // props.insert(*pw::keys::STREAM_CAPTURE_SINK, "true");
