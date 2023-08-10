@@ -479,25 +479,194 @@ impl<'d> Builder<'d> {
     }
 }
 
+/// Convenience macro to build a pod from values using a spa pod builder.
+///
+/// For arguments, the macro accepts the builder, and then the structure of the desired pod:
+///
+/// ```ignore
+/// builder_add(<&mut libspa::pod::builder::Builder>, Bool(<bool>));
+/// builder_add(<&mut libspa::pod::builder::Builder>, Id(<ibspa::utils::Id>));
+/// builder_add(<&mut libspa::pod::builder::Builder>, Int(<i32>));
+/// builder_add(<&mut libspa::pod::builder::Builder>, Long(<i64>));
+/// builder_add(<&mut libspa::pod::builder::Builder>, Float(<f32>));
+/// builder_add(<&mut libspa::pod::builder::Builder>, Double(<f64>));
+/// builder_add(<&mut libspa::pod::builder::Builder>, Bytes(<&[u8]>));
+/// // Macro using `Pointer` can only be called in `unsafe` block.
+/// // Safety rules from `Builder::add_pointer()` apply.
+/// builder_add(<&mut libspa::pod::builder::Builder>, Pointer(<*const c_void>));
+/// builder_add(<&mut libspa::pod::builder::Builder>, Fd(<i64>));
+/// builder_add(<&mut libspa::pod::builder::Builder>, Rectangle(<libspa::utils::Rectangle>));
+/// builder_add(<&mut libspa::pod::builder::Builder>, Fraction(<libspa::utils::Fraction>));
+/// builder_add(<&mut libspa::pod::builder::Builder>,
+///     Struct {
+///         // 0 to n fields, e.g.:
+///         Struct {
+///             Int(<i32>),
+///             Float(<f32>),
+///         },
+///         Bytes(<&[u8]>),
+///     }
+/// );
+/// builder_add(<&mut libspa::pod::builder::Builder>,
+///     Object(
+///         <type as u32>,
+///         <id as u32>
+///     ) {
+///         // 0 to n properties of format
+///         // `<key as u32> => <value>`
+///         // e.g.
+///           0 => Bool(false),
+///         313 => String("313"),
+///     }
+/// );
+/// ```
+///
+/// # Returns
+///
+/// The macro returns a `Result<(), Errno>`.
+/// If building succeeds, an `Ok(())` is returned.
+/// Otherwise, the `Err(Errno)` from the point where building failed is returned, and the rest of the values are not added.
+#[macro_export]
+macro_rules! __builder_add__ {
+    ($builder:expr, None) => {
+        $crate::pod::builder::Builder::add_none($builder)
+    };
+    ($builder:expr, Bool($val:expr)) => {
+        $crate::pod::builder::Builder::add_bool($builder, $val)
+    };
+    ($builder:expr, Id($val:expr)) => {
+        $crate::pod::builder::Builder::add_id($builder, $val)
+    };
+    ($builder:expr, Int($val:expr)) => {
+        $crate::pod::builder::Builder::add_int($builder, $val)
+    };
+    ($builder:expr, Long($val:expr)) => {
+        $crate::pod::builder::Builder::add_long($builder, $val)
+    };
+    ($builder:expr, Float($val:expr)) => {
+        $crate::pod::builder::Builder::add_float($builder, $val)
+    };
+    ($builder:expr, Double($val:expr)) => {
+        $crate::pod::builder::Builder::add_double($builder, $val)
+    };
+    ($builder:expr, String($val:expr)) => {
+        $crate::pod::builder::Builder::add_string($builder, $val)
+    };
+    ($builder:expr, Bytes($val:expr)) => {
+        $crate::pod::builder::Builder::add_bytes($builder, $val)
+    };
+    ($builder:expr, Pointer($type_:expr, $val:expr)) => {
+        $crate::pod::builder::Builder::add_bool($builder, $type_, $val)
+    };
+    ($builder:expr, Fd($val:expr)) => {
+        $crate::pod::builder::Builder::add_fd($builder, $val)
+    };
+    ($builder:expr, Rectangle($val:expr)) => {
+        $crate::pod::builder::Builder::add_rectangle($builder, $val)
+    };
+    ($builder:expr, Fraction($val:expr)) => {
+        $crate::pod::builder::Builder::add_fraction($builder, $val)
+    };
+    // TODO: Choice
+    (
+        $builder:expr,
+        Struct {
+            $( $field_type:tt $field:tt ),* $(,)?
+        }
+    ) => {
+        'outer: {
+            let mut frame: ::std::mem::MaybeUninit<$crate::sys::spa_pod_frame> = ::std::mem::MaybeUninit::uninit();
+            let res = unsafe { $crate::pod::builder::Builder::push_struct($builder, &mut frame) };
+            if res.is_err() {
+                break 'outer res;
+            }
+
+            $(
+                let res = __builder_add__!($builder, $field_type $field);
+                if res.is_err() {
+                    break 'outer res;
+                }
+            )*
+
+            unsafe { $crate::pod::builder::Builder::pop($builder, frame.assume_init_mut()) }
+
+            Ok(())
+        }
+    };
+    (
+        $builder:expr,
+        Object($type_:expr, $id:expr $(,)?) {
+            $( $key:expr => $value_type:tt $value:tt ),* $(,)?
+        }
+    ) => {
+        'outer: {
+            let mut frame: ::std::mem::MaybeUninit<$crate::sys::spa_pod_frame> = ::std::mem::MaybeUninit::uninit();
+            let res = unsafe { $crate::pod::builder::Builder::push_object($builder, &mut frame, $type_, $id) };
+            if res.is_err() {
+                break 'outer res;
+            }
+
+            $(
+                let res = $crate::pod::builder::Builder::add_prop($builder, $key, 0);
+                if res.is_err() {
+                    break 'outer res;
+                }
+                let res = __builder_add__!($builder, $value_type $value);
+                if res.is_err() {
+                    break 'outer res;
+                }
+            )*
+
+            unsafe { $crate::pod::builder::Builder::pop($builder, frame.assume_init_mut()) }
+
+            Ok(())
+        }
+    };
+    // TODO: Sequence
+    // TODO: Control
+}
+pub use __builder_add__ as builder_add;
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn struct_pod() {
+    fn build_empty_struct() {
         let mut data = Vec::new();
 
         let mut builder = Builder::new(&mut data);
-        unsafe {
-            let mut struct_frame: MaybeUninit<spa_sys::spa_pod_frame> = MaybeUninit::uninit();
-            println!("Pushing struct");
-            builder.push_struct(&mut struct_frame).unwrap();
-            println!("Pushing int");
-            builder.add_int(3).unwrap();
-            println!("Popping struct");
-            builder.pop(struct_frame.assume_init_mut());
-        }
+        let res = builder_add!(&mut builder, Struct {});
+
+        assert!(res.is_ok());
+
+        let other: Vec<u8> = [
+            0u32.to_ne_bytes(),  // body has size 16
+            14u32.to_ne_bytes(), // struct type is 14
+        ]
+        .iter()
+        .copied()
+        .flatten()
+        .collect();
+
+        assert_eq!(&data, &other)
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn build_small_struct() {
+        let mut data = Vec::new();
+
+        let mut builder = Builder::new(&mut data);
+        let res = builder_add!(
+            &mut builder,
+            Struct {
+                Int(3),
+            }
+        );
+
+        assert!(res.is_ok());
 
         let other: Vec<u8> = [
             16u32.to_ne_bytes(), // body has size 16
@@ -513,5 +682,67 @@ mod tests {
         .collect();
 
         assert_eq!(&data, &other)
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn build_complex_struct() {
+        let mut data = Vec::new();
+
+        let mut builder = Builder::new(&mut data);
+        let res = builder_add!(
+            &mut builder,
+            Struct {
+                Struct {
+                    Float(31.3),
+                    String("foo")
+                },
+                Int(3),
+            }
+        );
+
+        dbg!(res.unwrap());
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn build_empty_object() {
+        use crate::param::ParamType;
+
+        let mut data = Vec::new();
+        let mut builder = Builder::new(&mut data);
+        let res = builder_add!(
+            &mut builder,
+            Object(
+                ParamType::Format.as_raw(),
+                0,
+            ) {}
+        );
+
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn build_object() {
+        use crate::format::FormatProperties;
+        use crate::format::{MediaSubtype, MediaType};
+        use crate::param::ParamType;
+
+        let mut data = Vec::new();
+        let mut builder = Builder::new(&mut data);
+        let res = builder_add!(
+            &mut builder,
+            Object(
+                ParamType::Format.as_raw(),
+                0,
+            ) {
+                FormatProperties::MediaType.as_raw() => Id(crate::utils::Id(MediaType::Audio.as_raw())),
+                FormatProperties::MediaSubtype.as_raw() => Id(crate::utils::Id(MediaSubtype::Raw.as_raw())),
+            }
+        );
+
+        assert!(res.is_ok());
     }
 }
