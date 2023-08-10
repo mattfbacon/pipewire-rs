@@ -225,7 +225,7 @@ impl<'d> Parser<'d> {
         }
     }
 
-    pub fn get_bytes(&mut self) -> Result<&[u8], Errno> {
+    pub fn get_bytes(&mut self) -> Result<&'d [u8], Errno> {
         unsafe {
             let mut bytes: MaybeUninit<*const u8> = MaybeUninit::uninit();
             let mut len: MaybeUninit<u32> = MaybeUninit::uninit();
