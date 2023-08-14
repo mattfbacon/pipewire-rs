@@ -582,7 +582,7 @@ macro_rules! __builder_add__ {
             }
 
             $(
-                let res = __builder_add__!($builder, $field_type $field);
+                let res = $crate::__builder_add__!($builder, $field_type $field);
                 if res.is_err() {
                     break 'outer res;
                 }
@@ -611,7 +611,7 @@ macro_rules! __builder_add__ {
                 if res.is_err() {
                     break 'outer res;
                 }
-                let res = __builder_add__!($builder, $value_type $value);
+                let res = $crate::__builder_add__!($builder, $value_type $value);
                 if res.is_err() {
                     break 'outer res;
                 }

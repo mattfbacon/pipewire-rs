@@ -510,7 +510,7 @@ macro_rules! __parser_get__ {
             }
 
             $(
-                let res = __parser_get__!($parser, $field_type $field);
+                let res = $crate::__parser_get__!($parser, $field_type $field);
                 if res.is_err() {
                     // Discard Ok variant value so we can assign to Result<(), Errno>
                     break 'outer res.map(|_| {});
