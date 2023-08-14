@@ -210,7 +210,7 @@ impl<'d> Parser<'d> {
         }
     }
 
-    pub fn get_string_raw(&mut self) -> Result<&CStr, Errno> {
+    pub fn get_string_raw(&mut self) -> Result<&'d CStr, Errno> {
         unsafe {
             let mut string: MaybeUninit<*const c_char> = MaybeUninit::uninit();
             let res = spa_sys::spa_pod_parser_get_string(self.as_raw_ptr(), string.as_mut_ptr());
