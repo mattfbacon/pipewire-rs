@@ -299,16 +299,20 @@ impl<'d> Parser<'d> {
         }
     }
 
-    /// # Safety
-    ///
-    /// TOOD: Constraints unknown, use at own risk
-    pub unsafe fn get_pod(&mut self) -> Result<*mut spa_sys::spa_pod, Errno> {
-        let mut pod: MaybeUninit<*mut spa_sys::spa_pod> = MaybeUninit::uninit();
-        let res = spa_sys::spa_pod_parser_get_pod(self.as_raw_ptr(), pod.as_mut_ptr());
-        if res >= 0 {
-            Ok(pod.assume_init())
-        } else {
-            Err(Errno::from_i32(-res))
+    pub fn get_pod(&mut self) -> Result<&'d crate::pod::Pod, Errno> {
+        unsafe {
+            let mut pod: MaybeUninit<*mut spa_sys::spa_pod> = MaybeUninit::uninit();
+            let res = spa_sys::spa_pod_parser_get_pod(self.as_raw_ptr(), pod.as_mut_ptr());
+            if res >= 0 {
+                // Safety:
+                // spa_pod_parser_get_pod() guarantees that if res >= 0, then
+                // the returned pod is valid and fits in the parsed memory slice.
+                let pod = crate::pod::Pod::from_raw(pod.assume_init());
+
+                Ok(pod)
+            } else {
+                Err(Errno::from_i32(-res))
+            }
         }
     }
 
