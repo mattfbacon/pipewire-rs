@@ -374,6 +374,7 @@ impl<'d> Parser<'d> {
 /// parser_get!(<&mut libspa::pod::parser::Parser>, Fd(<&mut i64>));
 /// parser_get!(<&mut libspa::pod::parser::Parser>, Rectangle(<&mut libspa::utils::Rectangle>));
 /// parser_get!(<&mut libspa::pod::parser::Parser>, Fraction(<&mut libspa::utils::Fraction>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Pod(<&mut &libspa::pod::Pod>));
 /// parser_get!(<&mut libspa::pod::parser::Parser>,
 ///     Struct {
 ///         // 0 to n fields, e.g.:
@@ -504,7 +505,16 @@ macro_rules! __parser_get__ {
             res.map(|_| {})
         }
     };
-    // TODO: ($parser:expr, Pod($val:expr))
+    ($parser:expr, Pod($val:expr)) => {
+        {
+            let val: &mut $crate::pod::Pod = $val;
+            let res = $crate::pod::parser::Parser::get_pod($parser);
+            if let Ok(pod) = res {
+                *val = pod;
+            }
+            res.map(|_| {})
+        }
+    };
     ($parser:expr, Struct { $( $field_type:tt $field:tt ),* $(,)? }) => {
         'outer: {
             let mut frame: ::std::mem::MaybeUninit<$crate::sys::spa_pod_frame> = ::std::mem::MaybeUninit::uninit();
