@@ -363,18 +363,18 @@ impl<'d> Parser<'d> {
 /// For arguments, the macro accepts the parser, and then the structure of the desired pods:
 ///
 /// ```ignore
-/// parser_get(<&mut libspa::pod::parser::Parser>, Bool(<&mut bool>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Id(<&mut libspa::utils::Id>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Int(<&mut i32>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Long(<&mut i64>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Float(<&mut f32>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Double(<&mut f64>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Bytes(<&mut &[u8]>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Pointer(<&mut *const c_void>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Fd(<&mut i64>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Rectangle(<&mut libspa::utils::Rectangle>));
-/// parser_get(<&mut libspa::pod::parser::Parser>, Fraction(<&mut libspa::utils::Fraction>));
-/// parser_get(<&mut libspa::pod::parser::Parser>,
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Bool(<&mut bool>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Id(<&mut libspa::utils::Id>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Int(<&mut i32>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Long(<&mut i64>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Float(<&mut f32>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Double(<&mut f64>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Bytes(<&mut &[u8]>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Pointer(<&mut *const c_void>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Fd(<&mut i64>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Rectangle(<&mut libspa::utils::Rectangle>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>, Fraction(<&mut libspa::utils::Fraction>));
+/// parser_get!(<&mut libspa::pod::parser::Parser>,
 ///     Struct {
 ///         // 0 to n fields, e.g.:
 ///         Struct {

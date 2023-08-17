@@ -484,20 +484,20 @@ impl<'d> Builder<'d> {
 /// For arguments, the macro accepts the builder, and then the structure of the desired pod:
 ///
 /// ```ignore
-/// builder_add(<&mut libspa::pod::builder::Builder>, Bool(<bool>));
-/// builder_add(<&mut libspa::pod::builder::Builder>, Id(<ibspa::utils::Id>));
-/// builder_add(<&mut libspa::pod::builder::Builder>, Int(<i32>));
-/// builder_add(<&mut libspa::pod::builder::Builder>, Long(<i64>));
-/// builder_add(<&mut libspa::pod::builder::Builder>, Float(<f32>));
-/// builder_add(<&mut libspa::pod::builder::Builder>, Double(<f64>));
-/// builder_add(<&mut libspa::pod::builder::Builder>, Bytes(<&[u8]>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Bool(<bool>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Id(<ibspa::utils::Id>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Int(<i32>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Long(<i64>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Float(<f32>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Double(<f64>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Bytes(<&[u8]>));
 /// // Macro using `Pointer` can only be called in `unsafe` block.
 /// // Safety rules from `Builder::add_pointer()` apply.
-/// builder_add(<&mut libspa::pod::builder::Builder>, Pointer(<*const c_void>));
-/// builder_add(<&mut libspa::pod::builder::Builder>, Fd(<i64>));
-/// builder_add(<&mut libspa::pod::builder::Builder>, Rectangle(<libspa::utils::Rectangle>));
-/// builder_add(<&mut libspa::pod::builder::Builder>, Fraction(<libspa::utils::Fraction>));
-/// builder_add(<&mut libspa::pod::builder::Builder>,
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Pointer(<*const c_void>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Fd(<i64>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Rectangle(<libspa::utils::Rectangle>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>, Fraction(<libspa::utils::Fraction>));
+/// builder_add!(<&mut libspa::pod::builder::Builder>,
 ///     Struct {
 ///         // 0 to n fields, e.g.:
 ///         Struct {
