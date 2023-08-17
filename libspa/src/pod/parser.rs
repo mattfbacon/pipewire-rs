@@ -499,8 +499,8 @@ macro_rules! __parser_get__ {
         {
             let val: &mut $crate::utils::Fraction = $val;
             let res = $crate::pod::parser::Parser::get_fraction($parser);
-            if let Ok(int) = res {
-                *val = int;
+            if let Ok(fraction) = res {
+                *val = fraction;
             }
             res.map(|_| {})
         }
