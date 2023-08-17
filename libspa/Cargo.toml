@@ -1,6 +1,6 @@
 [package]
 name = "libspa"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Guillaume Desmottes <guillaume.desmottes@collabora.com>"]
 rust-version = "1.65"
 edition = "2021"
