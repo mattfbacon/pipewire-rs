@@ -24,8 +24,8 @@ pub struct Core {
 }
 
 impl Core {
-    pub(crate) fn from_ptr(ptr: ptr::NonNull<pw_sys::pw_core>) -> Self {
-        let inner = CoreInner::from_ptr(ptr);
+    pub(crate) fn from_ptr(ptr: ptr::NonNull<pw_sys::pw_core>, _context: crate::Context) -> Self {
+        let inner = CoreInner::from_ptr(ptr, _context);
         Self {
             inner: Rc::new(inner),
         }
@@ -43,11 +43,12 @@ impl Deref for Core {
 #[derive(Debug)]
 pub struct CoreInner {
     ptr: ptr::NonNull<pw_sys::pw_core>,
+    _context: crate::Context,
 }
 
 impl CoreInner {
-    fn from_ptr(ptr: ptr::NonNull<pw_sys::pw_core>) -> Self {
-        Self { ptr }
+    fn from_ptr(ptr: ptr::NonNull<pw_sys::pw_core>, _context: crate::Context) -> Self {
+        Self { ptr, _context }
     }
 
     /// Get the underlying pointer for this `Core`.

@@ -2,47 +2,66 @@
 // SPDX-License-Identifier: MIT
 
 use std::{
+    fmt,
     os::unix::prelude::{IntoRawFd, OwnedFd},
     ptr,
+    rc::Rc,
 };
 
 use crate::core_::Core;
 use crate::error::Error;
-use crate::loop_::LoopRef;
+use crate::loop_::{AsLoop, LoopRef};
 use crate::properties::Properties;
 
-#[derive(Debug)]
-pub struct Context<T: AsRef<LoopRef> + Clone> {
+#[derive(Clone, Debug)]
+pub struct Context {
+    inner: Rc<ContextInner>,
+}
+
+pub struct ContextInner {
     ptr: ptr::NonNull<pw_sys::pw_context>,
     /// Store the loop here, so that the loop is not dropped before the context, which may lead to
     /// undefined behaviour.
-    _loop: T,
+    _loop: Rc<dyn AsRef<LoopRef>>,
 }
 
-impl<T: AsRef<LoopRef> + Clone> Context<T> {
-    fn new_internal(loop_: &T, properties: Option<Properties>) -> Result<Self, Error> {
+impl fmt::Debug for ContextInner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ContextInner")
+            .field("ptr", &self.ptr)
+            .finish()
+    }
+}
+
+impl Context {
+    fn new_internal(
+        loop_: Rc<dyn AsRef<LoopRef>>,
+        properties: Option<Properties>,
+    ) -> Result<Self, Error> {
         let props = properties.map_or(ptr::null(), |props| props.into_raw()) as *mut _;
         let context = unsafe {
-            pw_sys::pw_context_new(loop_.as_ref().as_raw() as *const _ as *mut _, props, 0)
+            pw_sys::pw_context_new((*loop_).as_ref().as_raw() as *const _ as *mut _, props, 0)
         };
         let context = ptr::NonNull::new(context).ok_or(Error::CreationFailed)?;
 
         Ok(Context {
-            ptr: context,
-            _loop: loop_.clone(),
+            inner: Rc::new(ContextInner {
+                ptr: context,
+                _loop: loop_,
+            }),
         })
     }
 
-    pub fn new(loop_: &T) -> Result<Self, Error> {
-        Self::new_internal(loop_, None)
+    pub fn new<T: AsLoop>(loop_: &T) -> Result<Self, Error> {
+        Self::new_internal(loop_.as_loop().clone(), None)
     }
 
-    pub fn with_properties(loop_: &T, properties: Properties) -> Result<Self, Error> {
-        Self::new_internal(loop_, Some(properties))
+    pub fn with_properties<T: AsLoop>(loop_: &T, properties: Properties) -> Result<Self, Error> {
+        Self::new_internal(loop_.as_loop().clone(), Some(properties))
     }
 
     fn as_ptr(&self) -> *mut pw_sys::pw_context {
-        self.ptr.as_ptr()
+        self.inner.ptr.as_ptr()
     }
 
     pub fn connect(&self, properties: Option<Properties>) -> Result<Core, Error> {
@@ -52,7 +71,7 @@ impl<T: AsRef<LoopRef> + Clone> Context<T> {
             let core = pw_sys::pw_context_connect(self.as_ptr(), properties, 0);
             let ptr = ptr::NonNull::new(core).ok_or(Error::CreationFailed)?;
 
-            Ok(Core::from_ptr(ptr))
+            Ok(Core::from_ptr(ptr, self.clone()))
         }
     }
 
@@ -64,13 +83,13 @@ impl<T: AsRef<LoopRef> + Clone> Context<T> {
             let core = pw_sys::pw_context_connect_fd(self.as_ptr(), raw_fd, properties, 0);
             let ptr = ptr::NonNull::new(core).ok_or(Error::CreationFailed)?;
 
-            Ok(Core::from_ptr(ptr))
+            Ok(Core::from_ptr(ptr, self.clone()))
         }
     }
 }
 
-impl<T: AsRef<LoopRef> + Clone> Drop for Context<T> {
+impl Drop for ContextInner {
     fn drop(&mut self) {
-        unsafe { pw_sys::pw_context_destroy(self.as_ptr()) }
+        unsafe { pw_sys::pw_context_destroy(self.ptr.as_ptr()) }
     }
 }

@@ -371,6 +371,12 @@ impl LoopRef {
     }
 }
 
+pub trait AsLoop {
+    type Target: AsRef<LoopRef> + 'static;
+
+    fn as_loop(&self) -> &Rc<Self::Target>;
+}
+
 #[derive(Clone, Debug)]
 pub struct Loop {
     inner: Rc<LoopInner>,
@@ -388,6 +394,14 @@ impl Loop {
     pub fn downgrade(&self) -> WeakLoop {
         let weak = Rc::downgrade(&self.inner);
         WeakLoop { weak }
+    }
+}
+
+impl AsLoop for Loop {
+    type Target = LoopInner;
+
+    fn as_loop(&self) -> &Rc<Self::Target> {
+        &self.inner
     }
 }
 

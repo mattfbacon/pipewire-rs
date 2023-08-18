@@ -5,8 +5,8 @@ use std::ops::Deref;
 use std::ptr;
 use std::rc::{Rc, Weak};
 
-use crate::LoopRef;
 use crate::{error::Error, Properties};
+use crate::{AsLoop, LoopRef};
 use spa::ReadableDict;
 
 #[derive(Debug, Clone)]
@@ -34,6 +34,14 @@ impl MainLoop {
     pub fn downgrade(&self) -> WeakMainLoop {
         let weak = Rc::downgrade(&self.inner);
         WeakMainLoop { weak }
+    }
+}
+
+impl AsLoop for MainLoop {
+    type Target = MainLoopInner;
+
+    fn as_loop(&self) -> &Rc<Self::Target> {
+        &self.inner
     }
 }
 
