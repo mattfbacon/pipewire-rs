@@ -2,7 +2,7 @@
 
 use bitflags::bitflags;
 use convert_case::{Case, Casing};
-use std::{ffi::CStr, fmt::Debug};
+use std::{ffi::CStr, fmt::Debug, os::raw::c_uint};
 
 pub use spa_sys::spa_fraction as Fraction;
 pub use spa_sys::spa_rectangle as Rectangle;
@@ -74,7 +74,7 @@ pub enum ChoiceEnum<T: CanonicalFixedSizedPod> {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub struct SpaTypes(pub spa_sys::_bindgen_ty_10);
+pub struct SpaTypes(pub c_uint);
 
 #[allow(non_upper_case_globals)]
 impl SpaTypes {
@@ -132,13 +132,13 @@ impl SpaTypes {
 
     pub const VendorOther: Self = Self(spa_sys::SPA_TYPE_VENDOR_Other);
 
-    /// Obtain a [`SpaTypes`] from a raw `_bindgen_ty_10` variant.
-    pub fn from_raw(raw: spa_sys::_bindgen_ty_10) -> Self {
+    /// Obtain a [`SpaTypes`] from a raw `c_uint` variant.
+    pub fn from_raw(raw: c_uint) -> Self {
         Self(raw)
     }
 
-    /// Get the raw [`spa_sys::_bindgen_ty_10`] representing this `SpaTypes`.
-    pub fn as_raw(&self) -> spa_sys::_bindgen_ty_10 {
+    /// Get the raw [`c_uint`](std::os::raw::c_uint) representing this `SpaTypes`.
+    pub fn as_raw(&self) -> c_uint {
         self.0
     }
 }
