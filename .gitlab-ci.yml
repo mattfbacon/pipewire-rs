@@ -19,7 +19,7 @@ include:
 .fedora:
   variables:
     # Update this tag when you want to trigger a rebuild
-    FDO_DISTRIBUTION_TAG: '2023-07-15.0'
+    BASE_TAG: '2023-07-15.0'
     FDO_DISTRIBUTION_VERSION: '38'
     # wget: required by install-rust.sh
     # openssl-devel, perl-FindBin: required to build cargo tools
@@ -42,19 +42,37 @@ include:
     - source ./ci/env.sh
     - mkdir .cargo && echo -e "[net]\ngit-fetch-with-cli = true" > .cargo/config
 
+.fedora-x86:
+  extends:
+    - .fedora
+  variables:
+    FDO_DISTRIBUTION_TAG: 'x86_64-$BASE_TAG'
+
+.fedora-arm:
+  extends:
+    - .fedora
+  variables:
+    FDO_DISTRIBUTION_TAG: 'aarch64-$BASE_TAG'
+
 .build:
   before_script:
     - source ./ci/env.sh
 
-container_fedora:
+container_fedora-x86:
   extends:
-    - .fedora
+    - .fedora-x86
+    - .fdo.container-build@fedora
+  stage: container
+
+container_fedora-arm:
+  extends:
+    - .fedora-arm
     - .fdo.container-build@fedora
   stage: container
 
 rustfmt:
   extends:
-    - .fedora
+    - .fedora-x86
     - .fdo.distribution-image@fedora
   stage: lint
   script:
@@ -63,26 +81,37 @@ rustfmt:
 
 check commits:
   extends:
-    - .fedora
+    - .fedora-x86
     - .fdo.distribution-image@fedora
   stage: lint
   script:
     - ci-fairy check-commits --textwidth 0 --no-signed-off-by --branch main
 
-test-stable:
-  extends:
-    - .fedora
-    - .fdo.distribution-image@fedora
-    - .build
-  stage: test
+.test-template: &test-definition
   script:
     - rustc --version
     - cargo build --color=always --all-targets
     - cargo test --color=always
 
+test-stable-x86:
+  extends:
+    - .fedora-x86
+    - .fdo.distribution-image@fedora
+    - .build
+  <<: *test-definition
+  stage: test
+
+test-stable-arm:
+  extends:
+    - .fedora-arm
+    - .fdo.distribution-image@fedora
+    - .build
+  <<: *test-definition
+  stage: test
+
 miri:
   extends:
-    - .fedora
+    - .fedora-x86
     - .fdo.distribution-image@fedora
     - .build
   stage: test
@@ -95,7 +124,7 @@ miri:
 
 rustdoc:
   extends:
-    - .fedora
+    - .fedora-x86
     - .fdo.distribution-image@fedora
     - .build
   stage: extras
@@ -108,7 +137,7 @@ rustdoc:
 
 clippy:
   extends:
-    - .fedora
+    - .fedora-x86
     - .fdo.distribution-image@fedora
     - .build
   stage: extras
@@ -118,7 +147,7 @@ clippy:
 
 deny:
   extends:
-    - .fedora
+    - .fedora-x86
     - .fdo.distribution-image@fedora
   stage: extras
   rules:
@@ -129,7 +158,7 @@ deny:
 
 outdated:
   extends:
-    - .fedora
+    - .fedora-x86
     - .fdo.distribution-image@fedora
   stage: extras
   rules:
@@ -140,7 +169,7 @@ outdated:
 
 pages:
   extends:
-    - .fedora
+    - .fedora-x86
     - .fdo.distribution-image@fedora
     - .build
   stage: 'deploy'
