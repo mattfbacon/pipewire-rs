@@ -15,7 +15,7 @@ use std::{
     ptr,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StreamState {
     Error(String),
     Unconnected,
@@ -176,11 +176,11 @@ impl StreamRef {
     /// Call from the `param_changed` callback to negotiate a new set of
     /// parameters for the stream.
     // FIXME: high-level API for params
-    pub fn update_params(&self, params: &mut [*const spa_sys::spa_pod]) -> Result<(), Error> {
+    pub fn update_params(&self, params: &mut [&spa::pod::Pod]) -> Result<(), Error> {
         let r = unsafe {
             pw_sys::pw_stream_update_params(
                 self.as_raw_ptr(),
-                params.as_mut_ptr(),
+                params.as_mut_ptr().cast(),
                 params.len() as u32,
             )
         };
