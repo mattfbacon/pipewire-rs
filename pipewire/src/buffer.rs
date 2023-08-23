@@ -36,6 +36,10 @@ impl Buffer<'_> {
 
         slice_of_data
     }
+
+    pub fn requested(&self) -> u64 {
+        unsafe { self.buf.as_ref().requested }
+    }
 }
 
 impl Drop for Buffer<'_> {
