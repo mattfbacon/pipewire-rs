@@ -37,6 +37,7 @@ impl Buffer<'_> {
         slice_of_data
     }
 
+    #[cfg(feature = "v0_3_49")]
     pub fn requested(&self) -> u64 {
         unsafe { self.buf.as_ref().requested }
     }
