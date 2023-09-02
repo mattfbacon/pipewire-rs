@@ -258,7 +258,18 @@ impl StreamRef {
         Ok(())
     }
 
-    // TODO: pw_stream_set_control()
+    pub fn set_control(&self, id: u32, values: &[f32]) -> Result<(), Error> {
+        let r = unsafe {
+            pw_sys::pw_stream_set_control(
+                self.as_raw_ptr(),
+                id,
+                values.len() as u32,
+                values.as_ptr() as *mut f32,
+            )
+        };
+        SpaResult::from_c(r).into_sync_result()?;
+        Ok(())
+    }
 
     // getters
 
