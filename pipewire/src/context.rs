@@ -11,7 +11,7 @@ use std::{
 use crate::core_::Core;
 use crate::error::Error;
 use crate::loop_::{AsLoop, LoopRef};
-use crate::properties::Properties;
+use crate::properties::{Properties, PropertiesRef};
 
 #[derive(Clone, Debug)]
 pub struct Context {
@@ -84,6 +84,20 @@ impl Context {
             let ptr = ptr::NonNull::new(core).ok_or(Error::CreationFailed)?;
 
             Ok(Core::from_ptr(ptr, self.clone()))
+        }
+    }
+
+    pub fn properties(&self) -> PropertiesRef {
+        unsafe {
+            let props = pw_sys::pw_context_get_properties(self.as_ptr());
+            let props = ptr::NonNull::new(props.cast_mut()).expect("context properties is NULL");
+            PropertiesRef::from_ptr(props)
+        }
+    }
+
+    pub fn update_properties<D: crate::spa::dict::ReadableDict>(&self, properties: &D) {
+        unsafe {
+            pw_sys::pw_context_update_properties(self.as_ptr(), properties.get_dict_ptr());
         }
     }
 }
