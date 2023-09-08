@@ -193,6 +193,7 @@ impl VideoInterlaceMode {
 }
 
 impl Debug for VideoInterlaceMode {
+    #[cfg(feature = "v0_3_65")]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let c_str = unsafe {
             let c_buf = spa_sys::spa_debug_type_find_short_name(
@@ -209,6 +210,10 @@ impl Debug for VideoInterlaceMode {
             c_str.to_string_lossy().to_case(Case::Pascal)
         );
         f.write_str(&name)
+    }
+    #[cfg(not(feature = "v0_3_65"))]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self.0))
     }
 }
 

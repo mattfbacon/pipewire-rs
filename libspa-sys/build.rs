@@ -65,8 +65,12 @@ fn compile_reexported_symbols(libs: &system_deps::Dependencies) {
         println!("cargo:rerun-if-changed={file}");
     }
 
-    cc::Build::new()
-        .files(FILES)
-        .includes(libs.all_include_paths())
-        .compile("libspa-rs-reexports")
+    let mut cc = cc::Build::new();
+    cc.files(FILES);
+    cc.includes(libs.all_include_paths());
+
+    #[cfg(feature = "v0_3_65")]
+    cc.define("FEATURE_0_3_65", "1");
+
+    cc.compile("libspa-rs-reexports");
 }

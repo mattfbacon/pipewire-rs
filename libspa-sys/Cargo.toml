@@ -26,3 +26,6 @@ libpipewire = { name = "libpipewire-0.3", version = "0.3" }
 
 [lib]
 doctest = false # https://github.com/rust-lang/rust-bindgen/issues/1313
+
+[features]
+v0_3_65 = []
