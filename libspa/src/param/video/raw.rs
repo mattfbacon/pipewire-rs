@@ -3,7 +3,10 @@
 
 use crate::utils::{Fraction, Rectangle};
 use crate::{Error, SpaResult, SpaSuccess};
+
+#[cfg(feature = "v0_3_65")]
 use convert_case::{Case, Casing};
+
 use std::{ffi::CStr, fmt::Debug};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -192,8 +195,8 @@ impl VideoInterlaceMode {
     }
 }
 
+#[cfg(feature = "v0_3_65")]
 impl Debug for VideoInterlaceMode {
-    #[cfg(feature = "v0_3_65")]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let c_str = unsafe {
             let c_buf = spa_sys::spa_debug_type_find_short_name(
@@ -210,10 +213,6 @@ impl Debug for VideoInterlaceMode {
             c_str.to_string_lossy().to_case(Case::Pascal)
         );
         f.write_str(&name)
-    }
-    #[cfg(not(feature = "v0_3_65"))]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{}", self.0))
     }
 }
 
@@ -400,6 +399,11 @@ impl Default for VideoInfoRaw {
 
 impl Debug for VideoInfoRaw {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[cfg(feature = "v0_3_65")]
+        let interlace_mode = self.interlace_mode();
+        #[cfg(not(feature = "v0_3_65"))]
+        let interlace_mode = self.interlace_mode().as_raw();
+
         f.debug_struct("VideoInfoRaw")
             .field("format", &self.format())
             .field("flags", &self.flags())
@@ -408,7 +412,7 @@ impl Debug for VideoInfoRaw {
             .field("framerate", &self.framerate())
             .field("max_framerate", &self.max_framerate())
             .field("views", &self.views())
-            .field("interlace_mode", &self.interlace_mode())
+            .field("interlace_mode", &interlace_mode)
             .field("pixel_aspect_ratio", &self.pixel_aspect_ratio())
             .field("multiview_mode", &self.multiview_mode())
             .field("multiview_flags", &self.multiview_flags())
@@ -443,6 +447,7 @@ mod tests {
             "VideoFormat::xRGB_210LE",
             format!("{:?}", VideoFormat::xRGB_210LE)
         );
+        #[cfg(feature = "v0_3_65")]
         assert_eq!(
             "VideoInterlaceMode::Progressive",
             format!("{:?}", VideoInterlaceMode::Progressive)
