@@ -118,6 +118,7 @@ pub use main_loop::*;
 pub use properties::*;
 pub use pw_sys as sys;
 pub use spa;
+pub use thread_loop::*;
 
 pub mod buffer;
 pub mod channel;
@@ -136,6 +137,7 @@ mod properties;
 pub mod proxy;
 pub mod registry;
 pub mod stream;
+mod thread_loop;
 pub mod types;
 mod utils;
 
