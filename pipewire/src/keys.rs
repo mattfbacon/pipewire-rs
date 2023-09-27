@@ -4,7 +4,7 @@
 //! A collection of keys that are used to add extra information on objects.
 //!
 //! ```
-//! use pipewire::properties;
+//! use pipewire::properties::properties;
 //!
 //! let props = properties! {
 //!   *pipewire::keys::REMOTE_NAME => "pipewire-0"

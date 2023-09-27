@@ -11,11 +11,12 @@ use std::{
 
 use crate::{
     permissions::PermissionFlags,
+    properties::Properties,
     proxy::{Proxy, ProxyT},
     types::ObjectType,
-    Error, Properties,
+    Error,
 };
-use spa::{dict::ForeignDict, prelude::*};
+use spa::{prelude::*, utils::dict::ForeignDict};
 
 #[derive(Debug)]
 pub struct Registry {
@@ -64,7 +65,7 @@ impl Registry {
     }
 
     /// Attempt to destroy the global object with the specified id on the remote.
-    pub fn destroy_global(&self, global_id: u32) -> spa::SpaResult {
+    pub fn destroy_global(&self, global_id: u32) -> spa::utils::result::SpaResult {
         let result = unsafe {
             spa::spa_interface_call_method!(
                 self.as_ptr(),
@@ -74,7 +75,7 @@ impl Registry {
             )
         };
 
-        spa::SpaResult::from_c(result)
+        spa::utils::result::SpaResult::from_c(result)
     }
 }
 
@@ -109,7 +110,7 @@ pub struct Listener {
 
 impl Drop for Listener {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 

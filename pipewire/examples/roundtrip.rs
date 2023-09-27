@@ -1,19 +1,19 @@
 //! This program is the rust equivalent of https://gitlab.freedesktop.org/pipewire/pipewire/-/blob/master/doc/tutorial3.md.
 
-use pipewire::*;
+use pipewire as pw;
 use std::{cell::Cell, rc::Rc};
 
 fn main() {
-    pipewire::init();
+    pw::init();
 
     roundtrip();
 
-    unsafe { pipewire::deinit() };
+    unsafe { pw::deinit() };
 }
 
 fn roundtrip() {
-    let mainloop = MainLoop::new().expect("Failed to create main loop");
-    let context = Context::new(&mainloop).expect("Failed to create context");
+    let mainloop = pw::main_loop::MainLoop::new().expect("Failed to create main loop");
+    let context = pw::context::Context::new(&mainloop).expect("Failed to create context");
     let core = context.connect(None).expect("Failed to connect to core");
     let registry = core.get_registry().expect("Failed to get Registry");
 
@@ -31,7 +31,7 @@ fn roundtrip() {
     let _listener_core = core
         .add_listener_local()
         .done(move |id, seq| {
-            if id == PW_ID_CORE && seq == pending {
+            if id == pw::core::PW_ID_CORE && seq == pending {
                 done_clone.set(true);
                 loop_clone.quit();
             }

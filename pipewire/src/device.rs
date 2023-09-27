@@ -10,7 +10,7 @@ use crate::{
     proxy::{Listener, Proxy, ProxyT},
     types::ObjectType,
 };
-use spa::{dict::ForeignDict, pod::Pod, spa_interface_call_method};
+use spa::{pod::Pod, spa_interface_call_method, utils::dict::ForeignDict};
 
 #[derive(Debug)]
 pub struct Device {
@@ -195,7 +195,7 @@ impl Listener for DeviceListener {}
 
 impl Drop for DeviceListener {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 

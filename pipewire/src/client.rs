@@ -12,8 +12,8 @@ use crate::{
     proxy::{Listener, Proxy, ProxyT},
     types::ObjectType,
 };
-use spa::dict::ForeignDict;
 use spa::spa_interface_call_method;
+use spa::utils::dict::ForeignDict;
 
 #[derive(Debug)]
 pub struct Client {
@@ -66,7 +66,7 @@ impl Client {
         };
     }
 
-    pub fn update_properties<D: crate::spa::dict::ReadableDict>(&self, properties: &D) {
+    pub fn update_properties<D: crate::spa::utils::dict::ReadableDict>(&self, properties: &D) {
         unsafe {
             spa_interface_call_method!(
                 self.proxy.as_ptr(),
@@ -172,7 +172,7 @@ impl Listener for ClientListener {}
 
 impl Drop for ClientListener {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 

@@ -6,9 +6,9 @@ use std::ops::Deref;
 use std::ptr;
 use std::rc::{Rc, Weak};
 
-use crate::{error::Error, Properties};
-use crate::{AsLoop, LoopRef};
-use spa::ReadableDict;
+use crate::loop_::{AsLoop, LoopRef};
+use crate::{error::Error, properties::Properties};
+use spa::utils::dict::ReadableDict;
 
 /// A wrapper around the pipewire threaded loop interface. ThreadLoops are a higher level
 /// of abstraction around the loop interface. A ThreadLoop can be used to spawn a new thread

@@ -8,8 +8,8 @@ use pw::types::ObjectType;
 fn main() {
     // Initialize library and get the basic structures we need.
     pw::init();
-    let mainloop = pw::MainLoop::new().expect("Failed to create Pipewire Mainloop");
-    let context = pw::Context::new(&mainloop).expect("Failed to create Pipewire Context");
+    let mainloop = pw::main_loop::MainLoop::new().expect("Failed to create Pipewire Mainloop");
+    let context = pw::context::Context::new(&mainloop).expect("Failed to create Pipewire Context");
     let core = context
         .connect(None)
         .expect("Failed to connect to Pipewire Core");
@@ -47,7 +47,7 @@ fn main() {
     let link = core
         .create_object::<pw::link::Link, _>(
             factory.get().expect("No link factory found"),
-            &pw::properties! {
+            &pw::properties::properties! {
                 "link.output.port" => "1",
                 "link.input.port" => "2",
                 "link.output.node" => "3",
@@ -70,7 +70,7 @@ fn main() {
 
 /// Do a single roundtrip to process all events.
 /// See the example in roundtrip.rs for more details on this.
-fn do_roundtrip(mainloop: &pw::MainLoop, core: &pw::Core) {
+fn do_roundtrip(mainloop: &pw::main_loop::MainLoop, core: &pw::core::Core) {
     let done = Rc::new(Cell::new(false));
     let done_clone = done.clone();
     let loop_clone = mainloop.clone();
@@ -82,7 +82,7 @@ fn do_roundtrip(mainloop: &pw::MainLoop, core: &pw::Core) {
     let _listener_core = core
         .add_listener_local()
         .done(move |id, seq| {
-            if id == pw::PW_ID_CORE && seq == pending {
+            if id == pw::core::PW_ID_CORE && seq == pending {
                 done_clone.set(true);
                 loop_clone.quit();
             }

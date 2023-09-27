@@ -92,7 +92,7 @@ pub trait ReadableDict {
     /// # Examples
     /// ```
     /// use libspa::prelude::*;
-    /// use libspa::{StaticDict, static_dict};
+    /// use libspa::{utils::dict::StaticDict, static_dict};
     ///
     /// static DICT: StaticDict = static_dict! {
     ///     "true" => "true",
@@ -361,7 +361,7 @@ impl<'a> Iterator for Values<'a> {
 /// Create a `StaticDict` and access the stored values by key:
 /// ```rust
 /// use libspa::prelude::*;
-/// use libspa::{StaticDict, static_dict};
+/// use libspa::{utils::dict::StaticDict, static_dict};
 ///
 /// static DICT: StaticDict = static_dict!{
 ///     "Key" => "Value",
@@ -394,7 +394,7 @@ impl StaticDict {
 /// # Examples:
 /// Create a `StaticDict`.
 /// ```rust
-/// use libspa::{StaticDict, static_dict};
+/// use libspa::{utils::dict::StaticDict, static_dict};
 ///
 /// static PROPS: StaticDict = static_dict!{
 ///    "Key1" => "Value1",
@@ -404,7 +404,7 @@ impl StaticDict {
 #[macro_export]
 macro_rules! static_dict {
     {$($k:expr => $v:expr),+ $(,)?} => {{
-        use $crate::dict::{spa_dict_item, StaticDict, Flags};
+        use $crate::utils::dict::{spa_dict_item, StaticDict, Flags};
         use std::ptr;
 
         const ITEMS: &[spa_dict_item] = &[

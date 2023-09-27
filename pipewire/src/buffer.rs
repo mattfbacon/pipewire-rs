@@ -1,6 +1,6 @@
 use super::stream::StreamRef;
 
-use spa::data::Data;
+use spa::buffer::Data;
 use std::convert::TryFrom;
 use std::ptr::NonNull;
 

@@ -4,25 +4,15 @@
 //! The `libspa` crate provides a high-level API to interact with
 //! [libspa](https://gitlab.freedesktop.org/pipewire/pipewire/-/tree/master/doc/spa).
 
-pub use spa_sys as sys;
-
-pub mod data;
-pub mod dict;
-pub use dict::*;
-pub mod result;
-pub use result::*;
-mod direction;
-pub mod hook;
-pub mod interface;
-pub mod list;
-pub mod pod;
-pub mod utils;
-pub use direction::*;
-pub mod flags;
-pub mod format;
+pub mod buffer;
 pub mod param;
+pub mod pod;
+pub mod support;
+pub mod utils;
+
+pub use spa_sys as sys;
 
 /// prelude module re-exporing all the traits providing public API.
 pub mod prelude {
-    pub use crate::dict::{ReadableDict, WritableDict};
+    pub use crate::utils::dict::{ReadableDict, WritableDict};
 }

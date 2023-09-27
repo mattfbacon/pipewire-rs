@@ -5,9 +5,9 @@ use std::ops::Deref;
 use std::ptr;
 use std::rc::{Rc, Weak};
 
-use crate::{error::Error, Properties};
-use crate::{AsLoop, LoopRef};
-use spa::ReadableDict;
+use crate::loop_::{AsLoop, LoopRef};
+use crate::{error::Error, properties::Properties};
+use spa::utils::dict::ReadableDict;
 
 #[derive(Debug, Clone)]
 pub struct MainLoop {

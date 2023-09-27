@@ -11,5 +11,5 @@ pub enum Error {
     #[error("Wrong proxy type")]
     WrongProxyType,
     #[error(transparent)]
-    SpaError(#[from] spa::Error),
+    SpaError(#[from] spa::utils::result::Error),
 }

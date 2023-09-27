@@ -6,8 +6,8 @@ use std::{
 };
 
 use bitflags::bitflags;
-use spa::dict::ForeignDict;
 use spa::spa_interface_call_method;
+use spa::utils::dict::ForeignDict;
 
 use crate::{
     proxy::{Listener, Proxy, ProxyT},
@@ -63,7 +63,7 @@ impl Listener for LinkListener {}
 
 impl Drop for LinkListener {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 

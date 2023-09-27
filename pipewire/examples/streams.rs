@@ -6,7 +6,7 @@
 //! tut: https://docs.pipewire.org/page_tutorial5.html
 
 use pipewire as pw;
-use pw::{properties, spa};
+use pw::{properties::properties, spa};
 
 use clap::Parser;
 use spa::pod::Pod;
@@ -27,8 +27,8 @@ pub fn main() -> Result<(), pw::Error> {
 
     let opt = Opt::parse();
 
-    let mainloop = pw::MainLoop::new()?;
-    let context = pw::Context::new(&mainloop)?;
+    let mainloop = pw::main_loop::MainLoop::new()?;
+    let context = pw::context::Context::new(&mainloop)?;
     let core = context.connect(None)?;
 
     let data = UserData {
@@ -71,8 +71,8 @@ pub fn main() -> Result<(), pw::Error> {
                     Err(_) => return,
                 };
 
-            if media_type != pw::spa::format::MediaType::Video
-                || media_subtype != pw::spa::format::MediaSubtype::Raw
+            if media_type != pw::spa::param::format::MediaType::Video
+                || media_subtype != pw::spa::param::format::MediaSubtype::Raw
             {
                 return;
             }
@@ -124,17 +124,17 @@ pub fn main() -> Result<(), pw::Error> {
         pw::spa::utils::SpaTypes::ObjectParamFormat,
         pw::spa::param::ParamType::EnumFormat,
         pw::spa::pod::property!(
-            pw::spa::format::FormatProperties::MediaType,
+            pw::spa::param::format::FormatProperties::MediaType,
             Id,
-            pw::spa::format::MediaType::Video
+            pw::spa::param::format::MediaType::Video
         ),
         pw::spa::pod::property!(
-            pw::spa::format::FormatProperties::MediaSubtype,
+            pw::spa::param::format::FormatProperties::MediaSubtype,
             Id,
-            pw::spa::format::MediaSubtype::Raw
+            pw::spa::param::format::MediaSubtype::Raw
         ),
         pw::spa::pod::property!(
-            pw::spa::format::FormatProperties::VideoFormat,
+            pw::spa::param::format::FormatProperties::VideoFormat,
             Choice,
             Enum,
             Id,
@@ -147,7 +147,7 @@ pub fn main() -> Result<(), pw::Error> {
             pw::spa::param::video::VideoFormat::I420,
         ),
         pw::spa::pod::property!(
-            pw::spa::format::FormatProperties::VideoSize,
+            pw::spa::param::format::FormatProperties::VideoSize,
             Choice,
             Range,
             Rectangle,
@@ -165,7 +165,7 @@ pub fn main() -> Result<(), pw::Error> {
             }
         ),
         pw::spa::pod::property!(
-            pw::spa::format::FormatProperties::VideoFramerate,
+            pw::spa::param::format::FormatProperties::VideoFramerate,
             Choice,
             Range,
             Fraction,
@@ -188,7 +188,7 @@ pub fn main() -> Result<(), pw::Error> {
     let mut params = [Pod::from_bytes(&values).unwrap()];
 
     stream.connect(
-        spa::Direction::Input,
+        spa::utils::Direction::Input,
         opt.target,
         pw::stream::StreamFlags::AUTOCONNECT | pw::stream::StreamFlags::MAP_BUFFERS,
         &mut params,

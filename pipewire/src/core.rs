@@ -15,7 +15,13 @@ use crate::{
     registry::Registry,
     Error,
 };
-use spa::{dict::ForeignDict, result::SpaResult, spa_interface_call_method, AsyncSeq};
+use spa::{
+    spa_interface_call_method,
+    utils::{
+        dict::ForeignDict,
+        result::{AsyncSeq, SpaResult},
+    },
+};
 
 pub const PW_ID_CORE: u32 = pw_sys::PW_ID_CORE;
 #[derive(Debug, Clone)]
@@ -24,7 +30,10 @@ pub struct Core {
 }
 
 impl Core {
-    pub(crate) fn from_ptr(ptr: ptr::NonNull<pw_sys::pw_core>, _context: crate::Context) -> Self {
+    pub(crate) fn from_ptr(
+        ptr: ptr::NonNull<pw_sys::pw_core>,
+        _context: crate::context::Context,
+    ) -> Self {
         let inner = CoreInner::from_ptr(ptr, _context);
         Self {
             inner: Rc::new(inner),
@@ -43,11 +52,11 @@ impl Deref for Core {
 #[derive(Debug)]
 pub struct CoreInner {
     ptr: ptr::NonNull<pw_sys::pw_core>,
-    _context: crate::Context,
+    _context: crate::context::Context,
 }
 
 impl CoreInner {
-    fn from_ptr(ptr: ptr::NonNull<pw_sys::pw_core>, _context: crate::Context) -> Self {
+    fn from_ptr(ptr: ptr::NonNull<pw_sys::pw_core>, _context: crate::context::Context) -> Self {
         Self { ptr, _context }
     }
 
@@ -148,7 +157,7 @@ impl CoreInner {
     /// ```
     ///
     /// See `pipewire/examples/create-delete-remote-objects.rs` in the crates repository for a more detailed example.
-    pub fn create_object<P: ProxyT, D: crate::spa::dict::ReadableDict>(
+    pub fn create_object<P: ProxyT, D: crate::spa::utils::dict::ReadableDict>(
         &self,
         factory_name: &str,
         properties: &D,
@@ -226,7 +235,7 @@ impl Listener {
 
 impl Drop for Listener {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 

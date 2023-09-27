@@ -8,7 +8,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::core_::Core;
+use crate::core::Core;
 use crate::error::Error;
 use crate::loop_::{AsLoop, LoopRef};
 use crate::properties::{Properties, PropertiesRef};
@@ -95,7 +95,7 @@ impl Context {
         }
     }
 
-    pub fn update_properties<D: crate::spa::dict::ReadableDict>(&self, properties: &D) {
+    pub fn update_properties<D: crate::spa::utils::dict::ReadableDict>(&self, properties: &D) {
         unsafe {
             pw_sys::pw_context_update_properties(self.as_ptr(), properties.get_dict_ptr());
         }

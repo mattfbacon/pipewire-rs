@@ -6,7 +6,7 @@
 //! tut: https://docs.pipewire.org/page_tutorial4.html
 
 use pipewire as pw;
-use pw::{properties, spa};
+use pw::{properties::properties, spa};
 use spa::pod::Pod;
 
 pub const DEFAULT_RATE: u32 = 44100;
@@ -17,8 +17,8 @@ pub const CHAN_SIZE: usize = std::mem::size_of::<i16>();
 
 pub fn main() -> Result<(), pw::Error> {
     pw::init();
-    let mainloop = pw::MainLoop::new()?;
-    let context = pw::Context::new(&mainloop)?;
+    let mainloop = pw::main_loop::MainLoop::new()?;
+    let context = pw::context::Context::new(&mainloop)?;
     let core = context.connect(None)?;
 
     let data: f64 = 0.0;
@@ -88,7 +88,7 @@ pub fn main() -> Result<(), pw::Error> {
     let mut params = [Pod::from_bytes(&values).unwrap()];
 
     stream.connect(
-        spa::Direction::Output,
+        spa::utils::Direction::Output,
         None,
         pw::stream::StreamFlags::AUTOCONNECT
             | pw::stream::StreamFlags::MAP_BUFFERS

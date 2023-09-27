@@ -10,17 +10,17 @@
 //!
 //! ## Getting started
 //! Most programs that interact with pipewire will need the same few basic objects:
-//! - A [`MainLoop`] that drives the program, reacting to any incoming events and dispatching method calls.
+//! - A [`MainLoop`](`main_loop::MainLoop`) that drives the program, reacting to any incoming events and dispatching method calls.
 //!   Most of a time, the program/thread will sit idle in this loop, waiting on events to occur.
-//! - A [`Context`] that keeps track of any pipewire resources.
-//! - A [`Core`] that is a proxy for the remote pipewire instance, used to send messages to and receive events from the
+//! - A [`Context`](`context::Context`) that keeps track of any pipewire resources.
+//! - A [`Core`](`core::Core`) that is a proxy for the remote pipewire instance, used to send messages to and receive events from the
 //!   remote server.
 //! - Optionally, a [`Registry`](`registry::Registry`) that can be used to manage and track available objects on the server.
 //!
 //! This is how they can be created:
 // ignored because https://gitlab.freedesktop.org/pipewire/pipewire-rs/-/issues/19
 //! ```no_run
-//! use pipewire::{MainLoop, Context};
+//! use pipewire::{main_loop::MainLoop, context::Context};
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let mainloop = MainLoop::new()?;
@@ -35,7 +35,7 @@
 //! Now you can start hooking up different kinds of callbacks to the objects to react to events, and call methods
 //! on objects to change the state of the remote.
 //! ```no_run
-//! use pipewire::{MainLoop, Context};
+//! use pipewire::{main_loop::MainLoop, context::Context};
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let mainloop = MainLoop::new()?;
@@ -77,7 +77,7 @@
 //! For example, we can call a function on an interval:
 //!
 //! ```no_run
-//! use pipewire::MainLoop;
+//! use pipewire::main_loop::MainLoop;
 //! use std::time::Duration;
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -100,7 +100,7 @@
 //! The pipewire library is not really thread-safe, so pipewire objects do not implement [`Send`](`std::marker::Send`)
 //! or [`Sync`](`std::marker::Sync`).
 //!
-//! However, you can spawn a [`MainLoop`] in another thread and do bidirectional communication using two channels.
+//! However, you can spawn a [`MainLoop`](`main_loop::MainLoop`) in another thread and do bidirectional communication using two channels.
 //!
 //! To send messages to the main thread, we can easily use a [`std::sync::mpsc`].
 //! Because we are stuck in the main loop in the pipewire thread and can't just block on receiving a message,
@@ -108,49 +108,45 @@
 //!
 //! See the [`pipewire::channel`](`crate::channel`) module for details.
 
-use std::ptr;
-
-pub use context::*;
-pub use core_::*;
-pub use error::*;
-pub use loop_::*;
-pub use main_loop::*;
-pub use properties::*;
-pub use pw_sys as sys;
-pub use spa;
-pub use thread_loop::*;
-
 pub mod buffer;
 pub mod channel;
 pub mod client;
 pub mod constants;
-mod context;
-mod core_;
+pub mod context;
+pub mod core;
 pub mod device;
-mod error;
 pub mod factory;
 pub mod keys;
 pub mod link;
-mod loop_;
-mod main_loop;
+pub mod loop_;
+pub mod main_loop;
 pub mod metadata;
 pub mod module;
 pub mod node;
 pub mod permissions;
 pub mod port;
-mod properties;
+pub mod properties;
 pub mod proxy;
 pub mod registry;
 pub mod stream;
-mod thread_loop;
+pub mod thread_loop;
 pub mod types;
+
+mod error;
+pub use error::*;
+
 mod utils;
+
+pub use pw_sys as sys;
+pub use spa;
 
 // Re-export all the traits in a prelude module, so that applications
 // can always "use pipewire::prelude::*" without getting conflicts
 pub mod prelude {
     pub use spa::prelude::*;
 }
+
+use std::ptr;
 
 /// Initialize PipeWire
 ///

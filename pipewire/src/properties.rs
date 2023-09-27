@@ -6,8 +6,7 @@ use std::{ffi::CString, fmt, marker::PhantomData, mem::ManuallyDrop, ptr};
 /// # Examples
 /// Create a `Properties` struct and access the stored values by key:
 /// ```rust
-/// use pipewire::prelude::*;
-/// use pipewire::{properties, Properties};
+/// use pipewire::{prelude::*, properties::{properties, Properties}};
 ///
 /// let props = properties!{
 ///     "Key" => "Value",
@@ -28,7 +27,7 @@ pub struct Properties {
 /// # Examples:
 /// Create a `Properties` struct from literals.
 /// ```rust
-/// use pipewire::properties;
+/// use pipewire::properties::properties;
 ///
 /// let props = properties!{
 ///    "Key1" => "Value1",
@@ -39,7 +38,7 @@ pub struct Properties {
 /// Any expression that evaluates to a `impl Into<Vec<u8>>` can be used for both keys and values.
 /// ```rust
 /// use pipewire::prelude::*;
-/// use pipewire::properties;
+/// use pipewire::properties::properties;
 ///
 /// let key = String::from("Key");
 /// let value = vec![86, 97, 108, 117, 101]; // "Value" as an ASCII u8 vector.
@@ -50,15 +49,17 @@ pub struct Properties {
 /// assert_eq!(Some("Value"), props.get("Key"));
 /// ```
 #[macro_export]
-macro_rules! properties {
+macro_rules! __properties__ {
     {$($k:expr => $v:expr),+ $(,)?} => {{
-        let mut properties = $crate::Properties::new();
+        let mut properties = $crate::properties::Properties::new();
         $(
-            <$crate::Properties as $crate::spa::WritableDict>::insert(&mut properties, $k, $v);
+            <$crate::properties::Properties as $crate::spa::utils::dict::WritableDict>::insert(&mut properties, $k, $v);
         )*
         properties
     }};
 }
+
+pub use __properties__ as properties;
 
 impl Properties {
     /// Create a new, initally empty `Properties` struct.

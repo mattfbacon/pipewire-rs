@@ -8,10 +8,10 @@ use std::{pin::Pin, ptr};
 
 use crate::{
     proxy::{Listener, Proxy, ProxyT},
-    spa::Direction,
+    spa::utils::Direction,
     types::ObjectType,
 };
-use spa::{dict::ForeignDict, pod::Pod, spa_interface_call_method};
+use spa::{pod::Pod, spa_interface_call_method, utils::dict::ForeignDict};
 
 #[derive(Debug)]
 pub struct Port {
@@ -190,7 +190,7 @@ impl Listener for PortListener {}
 
 impl Drop for PortListener {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 

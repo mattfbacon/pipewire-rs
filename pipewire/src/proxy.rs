@@ -122,7 +122,7 @@ impl Listener for ProxyListener {}
 
 impl Drop for ProxyListener {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 #[derive(Default)]

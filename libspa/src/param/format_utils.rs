@@ -4,9 +4,9 @@
 use std::mem::MaybeUninit;
 
 use crate::{
-    format::{MediaSubtype, MediaType},
+    param::format::{MediaSubtype, MediaType},
     pod::Pod,
-    Error, SpaResult,
+    utils::result::{Error, SpaResult},
 };
 
 /// helper function to parse format properties type

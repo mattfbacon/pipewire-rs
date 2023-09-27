@@ -1,5 +1,3 @@
-//! A module containing different kind of bitflags used with SPA.
-
 use bitflags::bitflags;
 
 bitflags! {

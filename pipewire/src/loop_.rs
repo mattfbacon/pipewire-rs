@@ -12,7 +12,7 @@ use std::{
 
 use libc::{c_int, c_void};
 pub use nix::sys::signal::Signal;
-use spa::{flags::IoFlags, result::SpaResult, spa_interface_call_method};
+use spa::{spa_interface_call_method, support::system::IoFlags, utils::result::SpaResult};
 
 use crate::{utils::assert_main_thread, Error};
 
@@ -21,7 +21,7 @@ use crate::{utils::assert_main_thread, Error};
 ///
 /// An owned version, [`Loop`], is available,
 /// which lets you create and own a [`pw_loop`](`pw_sys::pw_loop`),
-/// but other objects, such as [`MainLoop`](`crate::MainLoop`), also contain them.
+/// but other objects, such as [`MainLoop`](`crate::main_loop::MainLoop`), also contain them.
 #[repr(transparent)]
 pub struct LoopRef(pw_sys::pw_loop);
 

@@ -4,9 +4,13 @@
 //! Pipewire Stream
 
 use crate::buffer::Buffer;
-use crate::{error::Error, Core, Properties, PropertiesRef};
+use crate::{
+    core::Core,
+    error::Error,
+    properties::{Properties, PropertiesRef},
+};
 use bitflags::bitflags;
-use spa::result::SpaResult;
+use spa::utils::result::SpaResult;
 use std::{
     ffi::{self, CStr, CString},
     fmt::Debug,
@@ -149,7 +153,7 @@ impl StreamRef {
     // FIXME: high-level API for params
     pub fn connect(
         &self,
-        direction: spa::Direction,
+        direction: spa::utils::Direction,
         id: Option<u32>,
         flags: StreamFlags,
         params: &mut [&spa::pod::Pod],
@@ -665,7 +669,7 @@ impl<D> StreamListener<D> {
 
 impl<D> std::ops::Drop for StreamListener<D> {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 

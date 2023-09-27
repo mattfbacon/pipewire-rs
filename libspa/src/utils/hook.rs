@@ -1,7 +1,20 @@
 // Copyright The pipewire-rs Contributors.
 // SPDX-License-Identifier: MIT
 
-//! SPA interface.
+//! SPA hook
+
+use crate::utils::list;
+
+/// Remove a hook
+pub fn remove(mut hook: spa_sys::spa_hook) {
+    list::remove(&hook.link);
+
+    if let Some(removed) = hook.removed {
+        unsafe {
+            removed(&mut hook as *mut _);
+        }
+    }
+}
 
 /// Call a method on a spa_interface.
 ///
@@ -30,7 +43,7 @@
 ///     fn sync(&self, seq: i32) -> i32 {
 ///         unsafe {
 ///             spa::spa_interface_call_method!(
-///                 &self.ptr, pw_sys::pw_core_methods, sync, pipewire::PW_ID_CORE, seq
+///                 &self.ptr, pw_sys::pw_core_methods, sync, pipewire::core::PW_ID_CORE, seq
 ///             )
 ///         }
 ///     }

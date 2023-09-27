@@ -1,3 +1,6 @@
+// Copyright The pipewire-rs Contributors.
+// SPDX-License-Identifier: MIT
+
 use std::{convert::TryFrom, fmt::Debug};
 
 #[derive(Copy, Clone, PartialEq, Eq)]

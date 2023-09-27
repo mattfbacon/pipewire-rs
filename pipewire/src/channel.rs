@@ -13,7 +13,7 @@
 // ignored because https://gitlab.freedesktop.org/pipewire/pipewire-rs/-/issues/19
 //! ```no_run
 //! use std::{time::Duration, sync::mpsc, thread};
-//! use pipewire::MainLoop;
+//! use pipewire::main_loop::MainLoop;
 //!
 //! // Our message to the pipewire loop, this tells it to terminate.
 //! struct Terminate;
@@ -70,8 +70,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{IoSource, LoopRef};
-use spa::flags::IoFlags;
+use crate::loop_::{IoSource, LoopRef};
+use spa::support::system::IoFlags;
 
 /// A receiver that has not been attached to a loop.
 ///
@@ -211,7 +211,7 @@ impl<T> Drop for Channel<T> {
 /// Create a Sender-Receiver pair, where the sender can be used to send messages to the receiver.
 ///
 /// This functions similar to [`std::sync::mpsc`], but with a receiver that can be attached to any
-/// [`Loop`](`crate::Loop`) to have the loop invoke a callback with any new messages.
+/// [`LoopRef`](`crate::loop_::LoopRef`) to have the loop invoke a callback with any new messages.
 ///
 /// This can be used for inter-thread communication without shared state and where [`std::sync::mpsc`] can not be used
 /// because the receiving thread is running the pipewire loop.

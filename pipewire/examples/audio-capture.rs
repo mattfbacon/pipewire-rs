@@ -7,8 +7,8 @@
 
 use clap::Parser;
 use pipewire as pw;
-use pw::{properties, spa};
-use spa::format::{MediaSubtype, MediaType};
+use pw::{properties::properties, spa};
+use spa::param::format::{MediaSubtype, MediaType};
 use spa::param::format_utils;
 use spa::pod::Pod;
 #[cfg(feature = "v0_3_44")]
@@ -31,8 +31,8 @@ struct Opt {
 pub fn main() -> Result<(), pw::Error> {
     pw::init();
 
-    let mainloop = pw::MainLoop::new()?;
-    let context = pw::Context::new(&mainloop)?;
+    let mainloop = pw::main_loop::MainLoop::new()?;
+    let context = pw::context::Context::new(&mainloop)?;
     let core = context.connect(None)?;
 
     let data = UserData {
@@ -179,7 +179,7 @@ pub fn main() -> Result<(), pw::Error> {
     /* Now connect this stream. We ask that our process function is
      * called in a realtime thread. */
     stream.connect(
-        spa::Direction::Input,
+        spa::utils::Direction::Input,
         None,
         pw::stream::StreamFlags::AUTOCONNECT
             | pw::stream::StreamFlags::MAP_BUFFERS

@@ -92,7 +92,7 @@ impl Listener for MetadataListener {}
 
 impl Drop for MetadataListener {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 

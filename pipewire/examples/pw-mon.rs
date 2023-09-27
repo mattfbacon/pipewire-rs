@@ -8,14 +8,16 @@ use spa::pod::Pod;
 use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
 
-use pw::link::Link;
-use pw::metadata::Metadata;
-use pw::node::Node;
-use pw::port::Port;
-use pw::properties;
-use pw::proxy::{Listener, ProxyListener, ProxyT};
-use pw::types::ObjectType;
-use pw::Signal;
+use pw::{
+    link::Link,
+    loop_::Signal,
+    metadata::Metadata,
+    node::Node,
+    port::Port,
+    properties::properties,
+    proxy::{Listener, ProxyListener, ProxyT},
+    types::ObjectType,
+};
 
 struct Proxies {
     proxies_t: HashMap<u32, Box<dyn ProxyT>>,
@@ -54,7 +56,7 @@ impl Proxies {
 }
 
 fn monitor(remote: Option<String>) -> Result<()> {
-    let main_loop = pw::MainLoop::new()?;
+    let main_loop = pw::main_loop::MainLoop::new()?;
 
     let main_loop_weak = main_loop.downgrade();
     let _sig_int = main_loop.add_signal_local(Signal::SIGINT, move || {
@@ -69,7 +71,7 @@ fn monitor(remote: Option<String>) -> Result<()> {
         }
     });
 
-    let context = pw::Context::new(&main_loop)?;
+    let context = pw::context::Context::new(&main_loop)?;
     let props = remote.map(|remote| {
         properties! {
             *pw::keys::REMOTE_NAME => remote

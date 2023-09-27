@@ -1,5 +1,12 @@
 //! Miscellaneous and utility items.
 
+pub mod dict;
+mod direction;
+pub use direction::*;
+pub mod hook;
+pub mod list;
+pub mod result;
+
 use bitflags::bitflags;
 use convert_case::{Case, Casing};
 use std::{ffi::CStr, fmt::Debug, os::raw::c_uint};

@@ -3,8 +3,10 @@
 
 use crate::param::audio::AudioFormat;
 use crate::pod::{Property, Value, ValueArray};
-use crate::utils;
-use crate::{Error, SpaResult, SpaSuccess};
+use crate::utils::{
+    self,
+    result::{Error, SpaResult, SpaSuccess},
+};
 use std::fmt::Debug;
 
 bitflags::bitflags! {

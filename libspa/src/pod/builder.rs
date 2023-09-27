@@ -726,9 +726,10 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn build_object() {
-        use crate::format::FormatProperties;
-        use crate::format::{MediaSubtype, MediaType};
-        use crate::param::ParamType;
+        use crate::param::{
+            format::{FormatProperties, MediaSubtype, MediaType},
+            ParamType,
+        };
 
         let mut data = Vec::new();
         let mut builder = Builder::new(&mut data);

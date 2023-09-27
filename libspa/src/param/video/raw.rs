@@ -1,8 +1,10 @@
 // Copyright The pipewire-rs Contributors.
 // SPDX-License-Identifier: MIT
 
-use crate::utils::{Fraction, Rectangle};
-use crate::{Error, SpaResult, SpaSuccess};
+use crate::utils::{
+    result::{Error, SpaResult, SpaSuccess},
+    Fraction, Rectangle,
+};
 
 #[cfg(feature = "v0_3_65")]
 use convert_case::{Case, Casing};

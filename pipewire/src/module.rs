@@ -11,8 +11,8 @@ use crate::{
     proxy::{Listener, Proxy, ProxyT},
     types::ObjectType,
 };
-use spa::dict::ForeignDict;
 use spa::spa_interface_call_method;
+use spa::utils::dict::ForeignDict;
 
 #[derive(Debug)]
 pub struct Module {
@@ -140,7 +140,7 @@ impl Listener for ModuleListener {}
 
 impl Drop for ModuleListener {
     fn drop(&mut self) {
-        spa::hook::remove(*self.listener);
+        spa::utils::hook::remove(*self.listener);
     }
 }
 
