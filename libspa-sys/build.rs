@@ -9,15 +9,13 @@ fn main() {
         .probe()
         .expect("Cannot find libraries");
 
-    run_bindgen(&libs);
-    compile_reexported_symbols(&libs);
-}
-
-fn run_bindgen(libs: &system_deps::Dependencies) {
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=wrapper.h");
 
-    let builder = bindgen::Builder::default()
+    // Write bindings files to the $OUT_DIR/ directory.
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+    let builder = bindgen::builder()
         .header("wrapper.h")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
@@ -29,7 +27,12 @@ fn run_bindgen(libs: &system_deps::Dependencies) {
         .allowlist_type("spa_.*")
         .allowlist_var("SPA_.*")
         .prepend_enum_name(false)
-        .derive_eq(true);
+        .derive_eq(true)
+        // Create callable wrapper functions around SPAs `static inline` functions so they
+        // can be called via FFI
+        .wrap_static_fns(true)
+        .wrap_static_fns_suffix("_libspa_rs")
+        .wrap_static_fns_path(&out_path.join("static_fns"));
 
     let builder = libs
         .iter()
@@ -42,31 +45,21 @@ fn run_bindgen(libs: &system_deps::Dependencies) {
 
     let bindings = builder.generate().expect("Unable to generate bindings");
 
-    // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
-}
-
-fn compile_reexported_symbols(libs: &system_deps::Dependencies) {
-    const FILES: &[&str] = &[
-        "src/type-info.c",
-        "src/param.c",
-        "src/param_audio.c",
-        "src/param_video.c",
-        "src/debug/pod.c",
-        "src/pod/builder.c",
-        "src/pod/parser.c",
-        "src/utils/ringbuffer.c",
+    let cc_files = &[
+        PathBuf::from("src/type-info.c"),
+        out_path.join("static_fns.c"),
     ];
 
-    for file in FILES {
-        println!("cargo:rerun-if-changed={file}");
+    for file in cc_files {
+        println!("cargo:rerun-if-changed={}", file.to_str().unwrap());
     }
 
     let mut cc = cc::Build::new();
-    cc.files(FILES);
+    cc.files(cc_files);
+    cc.include(env!("CARGO_MANIFEST_DIR"));
     cc.includes(libs.all_include_paths());
 
     #[cfg(feature = "v0_3_65")]

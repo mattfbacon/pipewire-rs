@@ -472,10 +472,14 @@ impl<'d> Builder<'d> {
         }
     }
 
-    // FIXME: For some reason the raw function returns a u32 instead of a c_int like all the others,
-    // Change this when https://gitlab.freedesktop.org/pipewire/pipewire/-/merge_requests/1679 is merged and released
-    pub fn add_control(&mut self, offset: u32, type_: u32) -> u32 {
-        unsafe { spa_sys::spa_pod_builder_control(self.as_raw_ptr(), offset, type_) }
+    pub fn add_control(&mut self, offset: u32, type_: u32) -> c_int {
+        // Older versions of pipewire mistakenly had the return type as uint32_t,
+        // so we need to use try_into().unwrap() to ensure those versions also work
+        unsafe {
+            spa_sys::spa_pod_builder_control(self.as_raw_ptr(), offset, type_)
+                .try_into()
+                .unwrap()
+        }
     }
 }
 

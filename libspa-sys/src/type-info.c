@@ -62,24 +62,3 @@ const struct spa_type_info* libspa_rs_type_video_format = spa_type_video_format;
 const struct spa_type_info* libspa_rs_type_video_flags = spa_type_video_flags;
 const struct spa_type_info* libspa_rs_type_video_interlace_mode = spa_type_video_interlace_mode;
 #endif
-
-const struct spa_type_info* libspa_rs_debug_type_find(
-    const struct spa_type_info* info,
-    uint32_t type
-) {
-    return spa_debug_type_find(info, type);
-}
-
-const char* libspa_rs_debug_type_find_name(
-    const struct spa_type_info* info,
-    uint32_t type
-) {
-    return spa_debug_type_find_name(info, type);
-}
-
-const char* libspa_rs_debug_type_find_short_name(
-    const struct spa_type_info* info,
-    uint32_t type
-) {
-    return spa_debug_type_find_short_name(info, type);
-}

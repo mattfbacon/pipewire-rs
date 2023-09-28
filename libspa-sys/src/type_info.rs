@@ -1,5 +1,4 @@
 use super::*;
-use std::ffi::c_char;
 
 extern "C" {
     #[link_name = "libspa_rs_types"]
@@ -88,13 +87,6 @@ extern "C" {
     #[cfg(feature = "v0_3_65")]
     #[link_name = "libspa_rs_type_video_interlace_mode"]
     pub static spa_type_video_interlace_mode: *const spa_type_info;
-
-    #[link_name = "libspa_rs_debug_type_find"]
-    pub fn spa_debug_type_find(info: *const spa_type_info, type_: u32) -> *const spa_type_info;
-    #[link_name = "libspa_rs_debug_type_find_name"]
-    pub fn spa_debug_type_find_name(info: *const spa_type_info, type_: u32) -> *const c_char;
-    #[link_name = "libspa_rs_debug_type_find_short_name"]
-    pub fn spa_debug_type_find_short_name(info: *const spa_type_info, type_: u32) -> *const c_char;
 }
 
 #[cfg(test)]
