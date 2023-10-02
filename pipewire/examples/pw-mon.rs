@@ -5,8 +5,8 @@ use anyhow::Result;
 use clap::Parser;
 use pipewire as pw;
 use spa::pod::Pod;
+use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
-use std::{rc::Rc, sync::Arc};
 
 use pw::link::Link;
 use pw::metadata::Metadata;
@@ -97,8 +97,8 @@ fn monitor(remote: Option<String>) -> Result<()> {
         })
         .register();
 
-    let registry = Arc::new(core.get_registry()?);
-    let registry_weak = Arc::downgrade(&registry);
+    let registry = Rc::new(core.get_registry()?);
+    let registry_weak = Rc::downgrade(&registry);
 
     // Proxies and their listeners need to stay alive so store them here
     let proxies = Rc::new(RefCell::new(Proxies::new()));
