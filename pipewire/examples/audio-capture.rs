@@ -79,7 +79,7 @@ pub fn main() -> Result<(), pw::Error> {
 
     let _listener = stream
         .add_local_listener_with_user_data(data)
-        .param_changed(|_, id, user_data, param| {
+        .param_changed(|_, user_data, id, param| {
             // NULL means to clear the format
             let Some(param) = param else {
                 return;

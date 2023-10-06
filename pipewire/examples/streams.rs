@@ -54,10 +54,10 @@ pub fn main() -> Result<(), pw::Error> {
 
     let _listener = stream
         .add_local_listener_with_user_data(data)
-        .state_changed(|old, new| {
+        .state_changed(|_, _, old, new| {
             println!("State changed: {:?} -> {:?}", old, new);
         })
-        .param_changed(|_, id, user_data, param| {
+        .param_changed(|_, user_data, id, param| {
             let Some(param) = param else {
                 return;
             };

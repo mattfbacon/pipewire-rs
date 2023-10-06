@@ -327,25 +327,32 @@ impl StreamRef {
     // TODO: pw_stream_get_time()
 }
 
-type ParamChangedCB<D> = dyn FnMut(&StreamRef, u32, &mut D, Option<&spa::pod::Pod>);
+type ParamChangedCB<D> = dyn FnMut(&StreamRef, &mut D, u32, Option<&spa::pod::Pod>);
 type ProcessCB<D> = dyn FnMut(&StreamRef, &mut D);
 
+#[allow(clippy::type_complexity)]
 pub struct ListenerLocalCallbacks<D> {
-    pub state_changed: Option<Box<dyn FnMut(StreamState, StreamState)>>,
-    pub control_info: Option<Box<dyn FnMut(u32, *const pw_sys::pw_stream_control)>>,
-    #[allow(clippy::type_complexity)]
-    pub io_changed: Option<Box<dyn FnMut(u32, *mut os::raw::c_void, u32)>>,
+    pub state_changed: Option<Box<dyn FnMut(&StreamRef, &mut D, StreamState, StreamState)>>,
+    pub control_info:
+        Option<Box<dyn FnMut(&StreamRef, &mut D, u32, *const pw_sys::pw_stream_control)>>,
+    pub io_changed: Option<Box<dyn FnMut(&StreamRef, &mut D, u32, *mut os::raw::c_void, u32)>>,
     pub param_changed: Option<Box<ParamChangedCB<D>>>,
-    pub add_buffer: Option<Box<dyn FnMut(*mut pw_sys::pw_buffer)>>,
-    pub remove_buffer: Option<Box<dyn FnMut(*mut pw_sys::pw_buffer)>>,
+    pub add_buffer: Option<Box<dyn FnMut(&StreamRef, &mut D, *mut pw_sys::pw_buffer)>>,
+    pub remove_buffer: Option<Box<dyn FnMut(&StreamRef, &mut D, *mut pw_sys::pw_buffer)>>,
     pub process: Option<Box<ProcessCB<D>>>,
-    pub drained: Option<Box<dyn FnMut()>>,
+    pub drained: Option<Box<dyn FnMut(&StreamRef, &mut D)>>,
     #[cfg(feature = "v0_3_39")]
-    pub command: Option<Box<dyn FnMut(*const spa_sys::spa_command)>>,
+    pub command: Option<Box<dyn FnMut(&StreamRef, &mut D, *const spa_sys::spa_command)>>,
     #[cfg(feature = "v0_3_40")]
-    pub trigger_done: Option<Box<dyn FnMut()>>,
+    pub trigger_done: Option<Box<dyn FnMut(&StreamRef, &mut D)>>,
     pub user_data: D,
     stream: Option<ptr::NonNull<pw_sys::pw_stream>>,
+}
+
+unsafe fn unwrap_stream_ptr<'a>(stream: Option<ptr::NonNull<pw_sys::pw_stream>>) -> &'a StreamRef {
+    stream
+        .map(|ptr| ptr.cast::<StreamRef>().as_ref())
+        .expect("stream cannot be null")
 }
 
 impl<D> ListenerLocalCallbacks<D> {
@@ -384,9 +391,10 @@ impl<D> ListenerLocalCallbacks<D> {
         ) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.state_changed {
+                    let stream = unwrap_stream_ptr(state.stream);
                     let old = StreamState::from_raw(old, error);
                     let new = StreamState::from_raw(new, error);
-                    cb(old, new)
+                    cb(stream, &mut state.user_data, old, new)
                 };
             }
         }
@@ -398,7 +406,8 @@ impl<D> ListenerLocalCallbacks<D> {
         ) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.control_info {
-                    cb(id, control);
+                    let stream = unwrap_stream_ptr(state.stream);
+                    cb(stream, &mut state.user_data, id, control);
                 }
             }
         }
@@ -411,7 +420,8 @@ impl<D> ListenerLocalCallbacks<D> {
         ) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.io_changed {
-                    cb(id, area, size);
+                    let stream = unwrap_stream_ptr(state.stream);
+                    cb(stream, &mut state.user_data, id, area, size);
                 }
             }
         }
@@ -423,18 +433,14 @@ impl<D> ListenerLocalCallbacks<D> {
         ) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.param_changed {
-                    let stream = state
-                        .stream
-                        .map(|ptr| ptr.cast::<StreamRef>().as_ref())
-                        .expect("stream cannot be null");
-
+                    let stream = unwrap_stream_ptr(state.stream);
                     let param = if !param.is_null() {
                         Some(spa::pod::Pod::from_raw(param))
                     } else {
                         None
                     };
 
-                    cb(stream, id, &mut state.user_data, param);
+                    cb(stream, &mut state.user_data, id, param);
                 }
             }
         }
@@ -445,7 +451,8 @@ impl<D> ListenerLocalCallbacks<D> {
         ) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.add_buffer {
-                    cb(buffer);
+                    let stream = unwrap_stream_ptr(state.stream);
+                    cb(stream, &mut state.user_data, buffer);
                 }
             }
         }
@@ -456,7 +463,8 @@ impl<D> ListenerLocalCallbacks<D> {
         ) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.remove_buffer {
-                    cb(buffer);
+                    let stream = unwrap_stream_ptr(state.stream);
+                    cb(stream, &mut state.user_data, buffer);
                 }
             }
         }
@@ -464,10 +472,7 @@ impl<D> ListenerLocalCallbacks<D> {
         unsafe extern "C" fn on_process<D>(data: *mut ::std::os::raw::c_void) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.process {
-                    let stream = state
-                        .stream
-                        .map(|ptr| ptr.cast::<StreamRef>().as_ref())
-                        .expect("stream cannot be null");
+                    let stream = unwrap_stream_ptr(state.stream);
                     cb(stream, &mut state.user_data);
                 }
             }
@@ -476,7 +481,8 @@ impl<D> ListenerLocalCallbacks<D> {
         unsafe extern "C" fn on_drained<D>(data: *mut ::std::os::raw::c_void) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.drained {
-                    cb();
+                    let stream = unwrap_stream_ptr(state.stream);
+                    cb(stream, &mut state.user_data);
                 }
             }
         }
@@ -488,7 +494,8 @@ impl<D> ListenerLocalCallbacks<D> {
         ) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.command {
-                    cb(command);
+                    let stream = unwrap_stream_ptr(state.stream);
+                    cb(stream, &mut state.user_data, command);
                 }
             }
         }
@@ -497,7 +504,8 @@ impl<D> ListenerLocalCallbacks<D> {
         unsafe extern "C" fn on_trigger_done<D>(data: *mut ::std::os::raw::c_void) {
             if let Some(state) = (data as *mut ListenerLocalCallbacks<D>).as_mut() {
                 if let Some(cb) = &mut state.trigger_done {
-                    cb();
+                    let stream = unwrap_stream_ptr(state.stream);
+                    cb(stream, &mut state.user_data);
                 }
             }
         }
@@ -556,7 +564,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `state_changed` event.
     pub fn state_changed<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(StreamState, StreamState) + 'static,
+        F: FnMut(&StreamRef, &mut D, StreamState, StreamState) + 'static,
     {
         self.callbacks.state_changed = Some(Box::new(callback));
         self
@@ -565,7 +573,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `control_info` event.
     pub fn control_info<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(u32, *const pw_sys::pw_stream_control) + 'static,
+        F: FnMut(&StreamRef, &mut D, u32, *const pw_sys::pw_stream_control) + 'static,
     {
         self.callbacks.control_info = Some(Box::new(callback));
         self
@@ -574,7 +582,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `io_changed` event.
     pub fn io_changed<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(u32, *mut os::raw::c_void, u32) + 'static,
+        F: FnMut(&StreamRef, &mut D, u32, *mut os::raw::c_void, u32) + 'static,
     {
         self.callbacks.io_changed = Some(Box::new(callback));
         self
@@ -583,7 +591,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `param_changed` event.
     pub fn param_changed<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&StreamRef, u32, &mut D, Option<&spa::pod::Pod>) + 'static,
+        F: FnMut(&StreamRef, &mut D, u32, Option<&spa::pod::Pod>) + 'static,
     {
         self.callbacks.param_changed = Some(Box::new(callback));
         self
@@ -592,7 +600,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `add_buffer` event.
     pub fn add_buffer<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(*mut pw_sys::pw_buffer) + 'static,
+        F: FnMut(&StreamRef, &mut D, *mut pw_sys::pw_buffer) + 'static,
     {
         self.callbacks.add_buffer = Some(Box::new(callback));
         self
@@ -601,7 +609,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `remove_buffer` event.
     pub fn remove_buffer<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(*mut pw_sys::pw_buffer) + 'static,
+        F: FnMut(&StreamRef, &mut D, *mut pw_sys::pw_buffer) + 'static,
     {
         self.callbacks.remove_buffer = Some(Box::new(callback));
         self
@@ -619,7 +627,7 @@ impl<'a, D> ListenerLocalBuilder<'a, D> {
     /// Set the callback for the `drained` event.
     pub fn drained<F>(mut self, callback: F) -> Self
     where
-        F: FnMut() + 'static,
+        F: FnMut(&StreamRef, &mut D) + 'static,
     {
         self.callbacks.drained = Some(Box::new(callback));
         self
