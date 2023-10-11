@@ -76,7 +76,7 @@ impl Device {
         unsafe {
             spa_interface_call_method!(
                 self.proxy.as_ptr(),
-                pw_sys::pw_node_methods,
+                pw_sys::pw_device_methods,
                 set_param,
                 id.as_raw(),
                 flags,
