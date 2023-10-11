@@ -297,11 +297,11 @@ impl StreamRef {
     }
 
     /// Get the properties of the stream.
-    pub fn properties(&self) -> PropertiesRef<'_> {
+    pub fn properties(&self) -> &PropertiesRef {
         unsafe {
             let props = pw_sys::pw_stream_get_properties(self.as_raw_ptr());
-            let props = ptr::NonNull::new(props as *mut _).expect("stream properties is NULL");
-            PropertiesRef::from_ptr(props)
+            let props = ptr::NonNull::new(props.cast_mut()).expect("stream properties is NULL");
+            props.cast().as_ref()
         }
     }
 

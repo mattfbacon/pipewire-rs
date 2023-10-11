@@ -87,11 +87,11 @@ impl Context {
         }
     }
 
-    pub fn properties(&self) -> PropertiesRef {
+    pub fn properties(&self) -> &PropertiesRef {
         unsafe {
             let props = pw_sys::pw_context_get_properties(self.as_ptr());
             let props = ptr::NonNull::new(props.cast_mut()).expect("context properties is NULL");
-            PropertiesRef::from_ptr(props)
+            props.cast().as_ref()
         }
     }
 
