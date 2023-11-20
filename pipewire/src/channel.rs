@@ -119,7 +119,7 @@ impl<T: 'static> Receiver<T> {
 
 /// A [`Receiver`] that has been attached to a loop.
 ///
-/// Dropping this will cause it to be deattached from the loop, so no more messages will be received.
+/// Dropping this will cause it to be detached from the loop, so no more messages will be received.
 pub struct AttachedReceiver<'l, T>
 where
     T: 'static,
@@ -132,7 +132,7 @@ impl<'l, T> AttachedReceiver<'l, T>
 where
     T: 'static,
 {
-    /// Deattach the receiver from the loop.
+    /// Detach the receiver from the loop.
     ///
     /// No more messages will be received until you attach it to a loop again.
     #[must_use]

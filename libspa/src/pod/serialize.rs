@@ -234,7 +234,7 @@ impl<T> PodSerialize for (u32, *const T) {
     }
 }
 
-/// This struct is returned by [`PodSerialize`] implementors on serialization sucess.
+/// This struct is returned by [`PodSerialize`] implementors on serialization success.
 ///
 /// Because this can only be constructed by the [`PodSerializer`], [`PodSerialize`] implementors are forced
 /// to finish serialization of their pod instead of stopping after serializing only part of a pod.

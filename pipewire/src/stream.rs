@@ -50,7 +50,7 @@ impl StreamState {
 
 /// A wrapper around the pipewire stream interface. Streams are a higher
 /// level abstraction around nodes in the graph. A stream can be used to send or
-/// receive frames of audio of video data by connecting it to another node.
+/// receive frames of audio or video data by connecting it to another node.
 /// `D` is the user data, to allow passing extra context to the callbacks.
 pub struct Stream {
     ptr: ptr::NonNull<pw_sys::pw_stream>,
@@ -661,7 +661,7 @@ pub struct StreamListener<D> {
 impl<D> StreamListener<D> {
     /// Stop the listener from receiving any events
     ///
-    /// Removes the listener registration and cleans up allocated ressources.
+    /// Removes the listener registration and cleans up allocated resources.
     pub fn unregister(self) {
         // do nothing, drop will clean up.
     }

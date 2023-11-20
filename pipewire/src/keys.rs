@@ -15,7 +15,7 @@ use std::ffi::CStr;
 
 use once_cell::sync::Lazy;
 
-// unfortunatelly we have to take two args as concat_idents! is in experimental
+// unfortunately we have to take two args as concat_idents! is in experimental
 macro_rules! key_constant {
     ($name:ident, $pw_symbol:ident, #[doc = $doc:expr]) => {
         #[doc = $doc]

@@ -389,7 +389,7 @@ impl StaticDict {
 
 /// A macro for creating a new [`StaticDict`] with predefined key-value pairs.
 ///
-/// The macro accepts a list of static `Key => Value` pairs, seperated by commas.
+/// The macro accepts a list of static `Key => Value` pairs, separated by commas.
 ///
 /// # Examples:
 /// Create a `StaticDict`.

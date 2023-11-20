@@ -127,12 +127,12 @@ impl std::ops::Drop for Foo {
 Different from Rust, C-style enums are simply named integers and do not offer the same type safety.
 When writing bindings for these enums in Rust, do not use Rust `enum`s, instead use a Tuple struct wrapping the raw integer type and create public constants for each enum variant.
 
-This has the folling advantages:
+This has the following advantages:
 - Conversions are zero-cost, instead of requiring big match statements mapping the raw integers to enum variants
   and the other way around
 - Unknown variants (such as new additions to the C library) don't need to be handled, they are represented as any other variant
   and are simply missing the associated constant on the wrapper type
-- As a rust enum would be marked `#[non_exhaustive]` to allow for furture additions anyways, the tuple wrapper type
+- As a rust enum would be marked `#[non_exhaustive]` to allow for future additions anyways, the tuple wrapper type
   "feels" almost the same as an enum, a user can create and match over any known variants like with a real enum
 
 ### Example

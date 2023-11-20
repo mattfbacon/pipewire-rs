@@ -27,10 +27,10 @@ Copyrights in the `pipewire-rs` project are retained by their contributors.
 Feel free to open an incomplete merge request prefixed with `WIP:` or `Draft:` if you want any help or early feedback.
 
 ## Creating a merge request
-`pipewire-rs` uses a fast-forward merge only policy, which means that your merge requst may need to be rebased onto the head of the upstream branch. \
+`pipewire-rs` uses a fast-forward merge only policy, which means that your merge request may need to be rebased onto the head of the upstream branch. \
 When creating the merge request, please enable `allow commits from members who can merge to the target branch` checkbox so that project members can take care of this for you.
 
 # Code of Conduct
-All contributers are expected to adhere to the [Contributor Covenant Code of Conduct](code_of_conduct.md).
+All contributors are expected to adhere to the [Contributor Covenant Code of Conduct](code_of_conduct.md).
 Any violations may be reported by opening a confidential issue
 on [GitLab](https://gitlab.freedesktop.org/pipewire/pipewire-rs/-/issues/new).

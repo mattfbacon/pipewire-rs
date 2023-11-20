@@ -214,7 +214,7 @@ impl<'de, P: FixedSizedPod + CanonicalFixedSizedPod + std::marker::Copy> PodDese
     }
 }
 
-/// This struct is returned by [`PodDeserialize`] implementors on deserialization sucess.
+/// This struct is returned by [`PodDeserialize`] implementors on deserialization success.
 ///
 /// Because this can only be constructed by the [`PodDeserializer`], [`PodDeserialize`] implementors are forced
 /// to finish deserialization of their pod instead of stopping after deserializing only part of a pod.
@@ -563,7 +563,7 @@ impl<'de> PodDeserializer<'de> {
         Ok((elements, success))
     }
 
-    /// Deserialize an `array` pod containing elments of type `T`.
+    /// Deserialize an `array` pod containing elements of type `T`.
     pub fn deserialize_array<V, T>(
         self,
         visitor: V,

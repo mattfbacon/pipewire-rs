@@ -131,7 +131,7 @@ impl LoopRef {
     /// Register some type of IO object with a callback that is called when reading/writing on the IO object
     /// is available.
     ///
-    /// The specified `event_mask` determines whether to trigger when either input, output, or any of the two is avaiable.
+    /// The specified `event_mask` determines whether to trigger when either input, output, or any of the two is available.
     ///
     /// The returned IoSource needs to take ownership of the IO object, but will provide a reference to the callback when called.
     #[must_use]

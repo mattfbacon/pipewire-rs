@@ -187,7 +187,7 @@ impl CoreInner {
 
     /// Destroy the object on the remote server represented by the provided proxy.
     ///
-    /// The proxy will be destroyed alongside the server side ressource, as it is no longer needed.
+    /// The proxy will be destroyed alongside the server side resource, as it is no longer needed.
     pub fn destroy_object<P: ProxyT>(&self, proxy: P) -> Result<AsyncSeq, Error> {
         let res = unsafe {
             spa_interface_call_method!(

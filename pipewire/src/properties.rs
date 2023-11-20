@@ -22,7 +22,7 @@ pub struct Properties {
 
 /// A macro for creating a new `Properties` struct with predefined key-value pairs.
 ///
-/// The macro accepts a list of `Key => Value` pairs, seperated by commas.
+/// The macro accepts a list of `Key => Value` pairs, separated by commas.
 ///
 /// # Examples:
 /// Create a `Properties` struct from literals.
@@ -62,7 +62,7 @@ macro_rules! __properties__ {
 pub use __properties__ as properties;
 
 impl Properties {
-    /// Create a new, initally empty `Properties` struct.
+    /// Create a new, initially empty `Properties` struct.
     pub fn new() -> Self {
         unsafe {
             let raw = std::ptr::NonNull::new(pw_sys::pw_properties_new(std::ptr::null()))

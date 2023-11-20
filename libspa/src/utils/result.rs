@@ -14,7 +14,7 @@ pub struct SpaResult(i32);
 
 /// An asynchronous sequence number returned by a SPA component.
 ///
-/// Use [`AsyncSeq::seq`] to retrive the actual sequence number.
+/// Use [`AsyncSeq::seq`] to retrieve the actual sequence number.
 #[derive(PartialEq, Eq, Copy, Clone)]
 pub struct AsyncSeq(i32);
 

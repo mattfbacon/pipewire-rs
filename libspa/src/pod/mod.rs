@@ -422,7 +422,7 @@ pub trait CanonicalFixedSizedPod: private::CanonicalFixedSizedPodSeal {
 
 mod private {
     /// This trait makes [`super::CanonicalFixedSizedPod`] a "sealed trait", which makes it impossible to implement
-    /// ouside of this crate.
+    /// outside of this crate.
     pub trait CanonicalFixedSizedPodSeal {}
     impl CanonicalFixedSizedPodSeal for () {}
     impl CanonicalFixedSizedPodSeal for bool {}
@@ -1057,7 +1057,7 @@ pub struct Object {
 
 /// A macro for creating a new [`Object`] with properties.
 ///
-/// The macro accepts the object type, id and a list of properties, seperated by commas.
+/// The macro accepts the object type, id and a list of properties, separated by commas.
 ///
 /// # Examples:
 /// Create an `Object`.
@@ -1096,7 +1096,7 @@ pub use __object__ as object;
 /// An object property.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Property {
-    /// key of the property, list of valid keys depends on the objec type.
+    /// key of the property, list of valid keys depends on the object type.
     pub key: u32,
     /// flags for the property.
     pub flags: PropertyFlags,
