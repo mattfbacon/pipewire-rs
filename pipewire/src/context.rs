@@ -3,6 +3,7 @@
 
 use std::{
     fmt,
+    ops::Deref,
     os::unix::prelude::{IntoRawFd, OwnedFd},
     ptr,
     rc::Rc,
@@ -12,6 +13,33 @@ use crate::core::Core;
 use crate::error::Error;
 use crate::loop_::{AsLoop, LoopRef};
 use crate::properties::{Properties, PropertiesRef};
+
+#[repr(transparent)]
+pub struct ContextRef(pw_sys::pw_context);
+
+impl ContextRef {
+    pub fn as_raw(&self) -> &pw_sys::pw_context {
+        &self.0
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_context {
+        std::ptr::addr_of!(self.0).cast_mut()
+    }
+
+    pub fn properties(&self) -> &PropertiesRef {
+        unsafe {
+            let props = pw_sys::pw_context_get_properties(self.as_raw_ptr());
+            let props = ptr::NonNull::new(props.cast_mut()).expect("context properties is NULL");
+            props.cast().as_ref()
+        }
+    }
+
+    pub fn update_properties<D: crate::spa::utils::dict::ReadableDict>(&self, properties: &D) {
+        unsafe {
+            pw_sys::pw_context_update_properties(self.as_raw_ptr(), properties.get_dict_ptr());
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Context {
@@ -60,15 +88,11 @@ impl Context {
         Self::new_internal(loop_.as_loop().clone(), Some(properties))
     }
 
-    fn as_ptr(&self) -> *mut pw_sys::pw_context {
-        self.inner.ptr.as_ptr()
-    }
-
     pub fn connect(&self, properties: Option<Properties>) -> Result<Core, Error> {
         let properties = properties.map_or(ptr::null_mut(), |p| p.into_raw());
 
         unsafe {
-            let core = pw_sys::pw_context_connect(self.as_ptr(), properties, 0);
+            let core = pw_sys::pw_context_connect(self.as_raw_ptr(), properties, 0);
             let ptr = ptr::NonNull::new(core).ok_or(Error::CreationFailed)?;
 
             Ok(Core::from_ptr(ptr, self.clone()))
@@ -80,25 +104,39 @@ impl Context {
 
         unsafe {
             let raw_fd = fd.into_raw_fd();
-            let core = pw_sys::pw_context_connect_fd(self.as_ptr(), raw_fd, properties, 0);
+            let core = pw_sys::pw_context_connect_fd(self.as_raw_ptr(), raw_fd, properties, 0);
             let ptr = ptr::NonNull::new(core).ok_or(Error::CreationFailed)?;
 
             Ok(Core::from_ptr(ptr, self.clone()))
         }
     }
+}
 
-    pub fn properties(&self) -> &PropertiesRef {
-        unsafe {
-            let props = pw_sys::pw_context_get_properties(self.as_ptr());
-            let props = ptr::NonNull::new(props.cast_mut()).expect("context properties is NULL");
-            props.cast().as_ref()
-        }
+impl std::convert::AsRef<ContextRef> for Context {
+    fn as_ref(&self) -> &ContextRef {
+        self.deref()
     }
+}
 
-    pub fn update_properties<D: crate::spa::utils::dict::ReadableDict>(&self, properties: &D) {
-        unsafe {
-            pw_sys::pw_context_update_properties(self.as_ptr(), properties.get_dict_ptr());
-        }
+impl std::ops::Deref for Context {
+    type Target = ContextInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl std::convert::AsRef<ContextRef> for ContextInner {
+    fn as_ref(&self) -> &ContextRef {
+        self.deref()
+    }
+}
+
+impl std::ops::Deref for ContextInner {
+    type Target = ContextRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*(self.ptr.as_ptr() as *mut ContextRef) }
     }
 }
 
