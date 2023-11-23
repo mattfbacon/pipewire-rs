@@ -203,13 +203,13 @@ impl ThreadLoopInner {
     /// to get a suitable timespec
     pub fn timed_wait_full(&self, abstime: nix::sys::time::TimeSpec) {
         unsafe {
-            let abstime = pw_sys::timespec {
+            let mut abstime = pw_sys::timespec {
                 tv_sec: abstime.tv_sec(),
                 tv_nsec: abstime.tv_nsec(),
             };
             pw_sys::pw_thread_loop_timed_wait_full(
                 self.as_ptr(),
-                &abstime as *const pw_sys::timespec,
+                &mut abstime as *mut pw_sys::timespec,
             );
         }
     }
