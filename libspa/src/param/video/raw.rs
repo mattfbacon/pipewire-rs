@@ -162,6 +162,7 @@ bitflags::bitflags! {
         /// Each color has been scaled by the alpha value.
         const PREMULTIPLIED_ALPHA = spa_sys::SPA_VIDEO_FLAG_PREMULTIPLIED_ALPHA;
         /// use the format modifier
+        #[cfg(feature = "v0_3_65")]
         const MODIFIER = spa_sys::SPA_VIDEO_FLAG_MODIFIER;
         #[cfg(feature = "v0_3_75")]
         /// format modifier was not fixated yet
