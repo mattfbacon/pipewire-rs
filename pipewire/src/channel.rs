@@ -65,7 +65,6 @@
 
 use std::{
     collections::VecDeque,
-    ffi::c_void,
     os::unix::prelude::*,
     sync::{Arc, Mutex},
 };
@@ -90,22 +89,15 @@ impl<T: 'static> Receiver<T> {
         F: Fn(T) + 'static,
     {
         let channel = self.channel.clone();
-        let eventfd = channel.lock().expect("Channel mutex lock poisoned").eventfd;
+        let readfd = channel.lock().expect("Channel mutex lock poisoned").readfd;
 
-        // Attach the eventfd as an IO source to the loop.
-        // Whenever the eventfd is signaled, call the users callback with each message in the queue.
-        let iosource = loop_.add_io(eventfd, IoFlags::IN, move |_| {
+        // Attach the pipe as an IO source to the loop.
+        // Whenever the pipe is written to, call the users callback with each message in the queue.
+        let iosource = loop_.add_io(readfd, IoFlags::IN, move |_| {
             let mut channel = channel.lock().expect("Channel mutex lock poisoned");
 
-            // Read from the eventfd to make it block until written to again.
-            unsafe {
-                let mut _eventnum: u64 = 0;
-                libc::read(
-                    channel.eventfd,
-                    &mut _eventnum as *mut u64 as *mut c_void,
-                    std::mem::size_of::<u64>(),
-                );
-            }
+            // Read from the pipe to make it block until written to again.
+            let _ = nix::unistd::read(channel.readfd, &mut [0]);
 
             channel.queue.drain(..).for_each(&callback);
         });
@@ -170,16 +162,9 @@ impl<T> Sender<T> {
         // If no messages are waiting already, signal the receiver to read some.
         // Because the channel mutex is locked, it is alright to do this before pushing the message.
         if channel.queue.is_empty() {
-            let res = unsafe {
-                libc::write(
-                    channel.eventfd,
-                    &1u64 as *const u64 as *const c_void,
-                    std::mem::size_of::<u64>(),
-                )
-            };
-            if res == -1 {
-                // Eventfd write failed.
-                return Err(t);
+            match nix::unistd::write(channel.writefd, &[1u8]) {
+                Ok(_) => (),
+                Err(_) => return Err(t),
             }
         }
 
@@ -192,19 +177,19 @@ impl<T> Sender<T> {
 
 /// Shared state between the [`Sender`]s and the [`Receiver`].
 struct Channel<T> {
-    /// A raw eventfd used to signal the loop the receiver is attached to that messages are waiting.
-    eventfd: RawFd,
+    /// A pipe used to signal the loop the receiver is attached to that messages are waiting.
+    readfd: RawFd,
+    writefd: RawFd,
     /// Queue of any messages waiting to be received.
     queue: VecDeque<T>,
 }
 
 impl<T> Drop for Channel<T> {
     fn drop(&mut self) {
-        unsafe {
-            // We do not error check here, because the eventfd does not contain any data that might be lost,
-            // and because there is no way to handle an error in a `Drop` implementation anyways.
-            libc::close(self.eventfd);
-        }
+        // We do not error check here, because the pipe does not contain any data that might be lost,
+        // and because there is no way to handle an error in a `Drop` implementation anyways.
+        let _ = nix::unistd::close(self.readfd);
+        let _ = nix::unistd::close(self.writefd);
     }
 }
 
@@ -219,25 +204,11 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>)
 where
     T: 'static,
 {
-    // Manually open an eventfd that we can use to signal the loop thread to check for messages
-    // via an IoSource.
-    #[cfg(target_os = "linux")]
-    let eventfd = unsafe { libc::eventfd(0, libc::EFD_CLOEXEC) };
-    #[cfg(target_os = "freebsd")]
-    let eventfd = {
-        // Added in FreeBSD 13, libc crate doesn't target that yet
-        use std::os::raw::{c_int, c_uint};
-        extern "C" {
-            pub fn eventfd(name: c_uint, flags: c_int) -> c_int;
-        }
-        unsafe { eventfd(0, 0x00100000) }
-    };
-    if eventfd == -1 {
-        panic!("Failed to create eventfd: {}", nix::errno::errno())
-    }
+    let fds = nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC).unwrap();
 
     let channel: Arc<Mutex<Channel<T>>> = Arc::new(Mutex::new(Channel {
-        eventfd,
+        readfd: fds.0,
+        writefd: fds.1,
         queue: VecDeque::new(),
     }));
 
