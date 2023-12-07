@@ -79,14 +79,6 @@ rustfmt:
     - cargo fmt --version
     - cargo fmt -- --color=always --check
 
-check commits:
-  extends:
-    - .fedora-x86
-    - .fdo.distribution-image@fedora
-  stage: lint
-  script:
-    - ci-fairy check-commits --textwidth 0 --no-signed-off-by --branch main
-
 .test-template: &test-definition
   script:
     - rustc --version
