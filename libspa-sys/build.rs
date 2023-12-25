@@ -48,13 +48,11 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
-    let cc_files = &[
-        PathBuf::from("src/type-info.c"),
-        out_path.join("static_fns.c"),
-    ];
+    const FILES: &[&str] = &["src/type-info.c"];
+    let cc_files = &[PathBuf::from(FILES[0]), out_path.join("static_fns.c")];
 
-    for file in cc_files {
-        println!("cargo:rerun-if-changed={}", file.to_str().unwrap());
+    for file in FILES {
+        println!("cargo:rerun-if-changed={file}");
     }
 
     let mut cc = cc::Build::new();
