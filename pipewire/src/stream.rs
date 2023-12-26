@@ -64,8 +64,9 @@ impl Stream {
     /// Initialises a new stream with the given `name` and `properties`.
     pub fn new(core: &Core, name: &str, properties: Properties) -> Result<Self, Error> {
         let name = CString::new(name).expect("Invalid byte in stream name");
-        let stream =
-            unsafe { pw_sys::pw_stream_new(core.as_ptr(), name.as_ptr(), properties.into_raw()) };
+        let stream = unsafe {
+            pw_sys::pw_stream_new(core.as_raw_ptr(), name.as_ptr(), properties.into_raw())
+        };
         let stream = ptr::NonNull::new(stream).ok_or(Error::CreationFailed)?;
 
         Ok(Stream {

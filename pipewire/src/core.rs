@@ -21,50 +21,17 @@ use spa::{
 };
 
 pub const PW_ID_CORE: u32 = pw_sys::PW_ID_CORE;
-#[derive(Debug, Clone)]
-pub struct Core {
-    inner: Rc<CoreInner>,
-}
 
-impl Core {
-    pub(crate) fn from_ptr(
-        ptr: ptr::NonNull<pw_sys::pw_core>,
-        _context: crate::context::Context,
-    ) -> Self {
-        let inner = CoreInner::from_ptr(ptr, _context);
-        Self {
-            inner: Rc::new(inner),
-        }
-    }
-}
+#[repr(transparent)]
+pub struct CoreRef(pw_sys::pw_core);
 
-impl Deref for Core {
-    type Target = CoreInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-#[derive(Debug)]
-pub struct CoreInner {
-    ptr: ptr::NonNull<pw_sys::pw_core>,
-    _context: crate::context::Context,
-}
-
-impl CoreInner {
-    fn from_ptr(ptr: ptr::NonNull<pw_sys::pw_core>, _context: crate::context::Context) -> Self {
-        Self { ptr, _context }
+impl CoreRef {
+    pub fn as_raw(&self) -> &pw_sys::pw_core {
+        &self.0
     }
 
-    /// Get the underlying pointer for this `Core`.
-    ///
-    /// ## Safety
-    ///
-    /// The lifetime of the pointer should not exceed the lifetime of the `Core`
-    /// object itself.
-    pub(crate) fn as_ptr(&self) -> *mut pw_sys::pw_core {
-        self.ptr.as_ptr()
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_core {
+        std::ptr::addr_of!(self.0).cast_mut()
     }
 
     // TODO: add non-local version when we'll bind pw_thread_loop_start()
@@ -79,7 +46,7 @@ impl CoreInner {
     pub fn get_registry(&self) -> Result<Registry, Error> {
         let registry = unsafe {
             spa_interface_call_method!(
-                self.as_ptr(),
+                self.as_raw_ptr(),
                 pw_sys::pw_core_methods,
                 get_registry,
                 pw_sys::PW_VERSION_REGISTRY,
@@ -94,7 +61,7 @@ impl CoreInner {
     pub fn sync(&self, seq: i32) -> Result<AsyncSeq, Error> {
         let res = unsafe {
             spa_interface_call_method!(
-                self.as_ptr(),
+                self.as_raw_ptr(),
                 pw_sys::pw_core_methods,
                 sync,
                 PW_ID_CORE,
@@ -166,7 +133,7 @@ impl CoreInner {
 
         let res = unsafe {
             spa_interface_call_method!(
-                self.as_ptr(),
+                self.as_raw_ptr(),
                 pw_sys::pw_core_methods,
                 create_object,
                 factory_name.as_ptr(),
@@ -188,7 +155,7 @@ impl CoreInner {
     pub fn destroy_object<P: ProxyT>(&self, proxy: P) -> Result<AsyncSeq, Error> {
         let res = unsafe {
             spa_interface_call_method!(
-                self.as_ptr(),
+                self.as_raw_ptr(),
                 pw_sys::pw_core_methods,
                 destroy,
                 proxy.upcast_ref().as_ptr() as *mut c_void
@@ -197,6 +164,49 @@ impl CoreInner {
 
         let res = SpaResult::from_c(res).into_async_result()?;
         Ok(res)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Core {
+    inner: Rc<CoreInner>,
+}
+
+impl Core {
+    pub(crate) fn from_ptr(
+        ptr: ptr::NonNull<pw_sys::pw_core>,
+        _context: crate::context::Context,
+    ) -> Self {
+        let inner = CoreInner::from_ptr(ptr, _context);
+        Self {
+            inner: Rc::new(inner),
+        }
+    }
+}
+
+impl Deref for Core {
+    type Target = CoreRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.inner.deref().ptr.cast::<CoreRef>().as_ref() }
+    }
+}
+
+impl AsRef<CoreRef> for Core {
+    fn as_ref(&self) -> &CoreRef {
+        self.deref()
+    }
+}
+
+#[derive(Debug)]
+struct CoreInner {
+    ptr: ptr::NonNull<pw_sys::pw_core>,
+    _context: crate::context::Context,
+}
+
+impl CoreInner {
+    fn from_ptr(ptr: ptr::NonNull<pw_sys::pw_core>, _context: crate::context::Context) -> Self {
+        Self { ptr, _context }
     }
 }
 
@@ -211,7 +221,7 @@ struct ListenerLocalCallbacks {
 }
 
 pub struct ListenerLocalBuilder<'a> {
-    core: &'a CoreInner,
+    core: &'a CoreRef,
     cbs: ListenerLocalCallbacks,
 }
 
@@ -310,7 +320,7 @@ impl<'a> ListenerLocalBuilder<'a> {
         };
 
         let (listener, data) = unsafe {
-            let ptr = self.core.as_ptr();
+            let ptr = self.core.as_raw_ptr();
             let data = Box::into_raw(Box::new(self.cbs));
             let mut listener: Pin<Box<spa_sys::spa_hook>> = Box::pin(mem::zeroed());
             // Have to cast from pw-sys namespaced type to the equivalent spa-sys type
