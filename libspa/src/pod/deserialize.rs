@@ -710,6 +710,11 @@ impl<'de> PodDeserializer<'de> {
         }
 
         match child_type {
+            spa_sys::SPA_TYPE_Bool => {
+                let (values, success) = self.deserialize_choice_values::<bool>(num_values)?;
+                let choice = create_choice(choice_type, values, flags)?;
+                Ok((visitor.visit_choice_bool(choice)?, success))
+            }
             spa_sys::SPA_TYPE_Int => {
                 let (values, success) = self.deserialize_choice_values::<i32>(num_values)?;
                 let choice = create_choice(choice_type, values, flags)?;
@@ -1220,6 +1225,14 @@ pub trait Visitor<'de>: Sized {
     }
 
     /// The input contains an [`i32`] choice.
+    fn visit_choice_bool(
+        &self,
+        _choice: Choice<bool>,
+    ) -> Result<Self::Value, DeserializeError<&'de [u8]>> {
+        Err(DeserializeError::UnsupportedType)
+    }
+
+    /// The input contains an [`i32`] choice.
     fn visit_choice_i32(
         &self,
         _choice: Choice<i32>,
@@ -1547,6 +1560,13 @@ impl<'de> Visitor<'de> for ValueVisitor {
         Ok(Value::Object(object))
     }
 
+    fn visit_choice_bool(
+        &self,
+        choice: Choice<bool>,
+    ) -> Result<Self::Value, DeserializeError<&'de [u8]>> {
+        Ok(Value::Choice(ChoiceValue::Bool(choice)))
+    }
+
     fn visit_choice_i32(
         &self,
         choice: Choice<i32>,
@@ -1749,6 +1769,21 @@ impl<'de> Visitor<'de> for ValueArrayFdVisitor {
         elements: Vec<Self::ArrayElem>,
     ) -> Result<Self::Value, DeserializeError<&'de [u8]>> {
         Ok(ValueArray::Fd(elements))
+    }
+}
+
+/// A visitor producing [`Choice`] for boolean choice values.
+pub struct ChoiceBoolVisitor;
+
+impl<'de> Visitor<'de> for ChoiceBoolVisitor {
+    type Value = Choice<bool>;
+    type ArrayElem = Infallible;
+
+    fn visit_choice_bool(
+        &self,
+        choice: Choice<bool>,
+    ) -> Result<Self::Value, DeserializeError<&'de [u8]>> {
+        Ok(choice)
     }
 }
 

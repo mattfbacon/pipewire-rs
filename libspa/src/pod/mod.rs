@@ -42,10 +42,10 @@ use serialize::{PodSerialize, PodSerializer};
 use crate::utils::{Choice, Fd, Fraction, Id, Rectangle, SpaTypes};
 
 use self::deserialize::{
-    ChoiceDoubleVisitor, ChoiceFdVisitor, ChoiceFloatVisitor, ChoiceFractionVisitor,
-    ChoiceIdVisitor, ChoiceIntVisitor, ChoiceLongVisitor, ChoiceRectangleVisitor, DoubleVisitor,
-    FdVisitor, FloatVisitor, FractionVisitor, IdVisitor, IntVisitor, LongVisitor, PointerVisitor,
-    RectangleVisitor,
+    ChoiceBoolVisitor, ChoiceDoubleVisitor, ChoiceFdVisitor, ChoiceFloatVisitor,
+    ChoiceFractionVisitor, ChoiceIdVisitor, ChoiceIntVisitor, ChoiceLongVisitor,
+    ChoiceRectangleVisitor, DoubleVisitor, FdVisitor, FloatVisitor, FractionVisitor, IdVisitor,
+    IntVisitor, LongVisitor, PointerVisitor, RectangleVisitor,
 };
 
 /// A transparent wrapper around a `spa_sys::spa_pod`.
@@ -819,6 +819,20 @@ impl<'de> PodDeserialize<'de> for Fd {
     }
 }
 
+impl<'de> PodDeserialize<'de> for Choice<bool> {
+    fn deserialize(
+        deserializer: PodDeserializer<'de>,
+    ) -> Result<
+        (Self, deserialize::DeserializeSuccess<'de>),
+        deserialize::DeserializeError<&'de [u8]>,
+    >
+    where
+        Self: Sized,
+    {
+        deserializer.deserialize_choice(ChoiceBoolVisitor)
+    }
+}
+
 impl<'de> PodDeserialize<'de> for Choice<i32> {
     fn deserialize(
         deserializer: PodDeserializer<'de>,
@@ -1026,6 +1040,8 @@ pub enum ValueArray {
 /// A typed choice.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChoiceValue {
+    /// Choice on boolean values.
+    Bool(Choice<bool>),
     /// Choice on 32 bits integer values.
     Int(Choice<i32>),
     /// Choice on 64 bits integer values.
