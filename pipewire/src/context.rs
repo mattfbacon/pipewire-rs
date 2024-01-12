@@ -11,7 +11,7 @@ use std::{
 
 use crate::core::Core;
 use crate::error::Error;
-use crate::loop_::{AsLoop, LoopRef};
+use crate::loop_::{IsLoopRc, LoopRef};
 use crate::properties::{Properties, PropertiesRef};
 
 #[repr(transparent)]
@@ -49,7 +49,7 @@ pub struct ContextInner {
     ptr: ptr::NonNull<pw_sys::pw_context>,
     /// Store the loop here, so that the loop is not dropped before the context, which may lead to
     /// undefined behaviour.
-    _loop: Rc<dyn AsRef<LoopRef>>,
+    _loop: Box<dyn AsRef<LoopRef>>,
 }
 
 impl fmt::Debug for ContextInner {
@@ -61,10 +61,8 @@ impl fmt::Debug for ContextInner {
 }
 
 impl Context {
-    fn new_internal(
-        loop_: Rc<dyn AsRef<LoopRef>>,
-        properties: Option<Properties>,
-    ) -> Result<Self, Error> {
+    fn new_internal<T: IsLoopRc>(loop_: &T, properties: Option<Properties>) -> Result<Self, Error> {
+        let loop_: Box<dyn AsRef<LoopRef>> = Box::new(loop_.clone());
         let props = properties.map_or(ptr::null(), |props| props.into_raw()) as *mut _;
         let context = unsafe {
             pw_sys::pw_context_new((*loop_).as_ref().as_raw() as *const _ as *mut _, props, 0)
@@ -79,12 +77,12 @@ impl Context {
         })
     }
 
-    pub fn new<T: AsLoop>(loop_: &T) -> Result<Self, Error> {
-        Self::new_internal(loop_.as_loop().clone(), None)
+    pub fn new<T: IsLoopRc>(loop_: &T) -> Result<Self, Error> {
+        Self::new_internal(loop_, None)
     }
 
-    pub fn with_properties<T: AsLoop>(loop_: &T, properties: Properties) -> Result<Self, Error> {
-        Self::new_internal(loop_.as_loop().clone(), Some(properties))
+    pub fn with_properties<T: IsLoopRc>(loop_: &T, properties: Properties) -> Result<Self, Error> {
+        Self::new_internal(loop_, Some(properties))
     }
 
     pub fn connect(&self, properties: Option<Properties>) -> Result<Core, Error> {

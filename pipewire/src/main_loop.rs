@@ -1,13 +1,12 @@
 // Copyright The pipewire-rs Contributors.
 // SPDX-License-Identifier: MIT
 
-use std::ops::Deref;
-use std::ptr;
+use std::ptr::{self, NonNull};
 use std::rc::{Rc, Weak};
 
 use crate::{
     error::Error,
-    loop_::{AsLoop, LoopRef},
+    loop_::{IsLoopRc, LoopRef},
 };
 
 #[derive(Debug, Clone)]
@@ -17,46 +16,69 @@ pub struct MainLoop {
 
 impl MainLoop {
     /// Initialize Pipewire and create a new `MainLoop`
-    pub fn new() -> Result<Self, Error> {
+    pub fn new(properties: Option<&spa::utils::dict::DictRef>) -> Result<Self, Error> {
         super::init();
-        let inner = MainLoopInner::new(None)?;
-        Ok(Self {
-            inner: Rc::new(inner),
-        })
+
+        unsafe {
+            let props = properties
+                .map_or(ptr::null(), |props| props.as_raw())
+                .cast_mut();
+            let l = pw_sys::pw_main_loop_new(props);
+            let ptr = ptr::NonNull::new(l).ok_or(Error::CreationFailed)?;
+
+            Ok(Self::from_raw(ptr))
+        }
     }
 
-    pub fn with_properties(properties: &spa::utils::dict::DictRef) -> Result<Self, Error> {
-        let inner = MainLoopInner::new(Some(properties))?;
-        Ok(Self {
-            inner: Rc::new(inner),
-        })
+    /// Create a new main loop from a raw [`pw_main_loop`](`pw_sys::pw_main_loop`), taking ownership of it.
+    ///
+    /// # Safety
+    /// The provided pointer must point to a valid, well aligned [`pw_main_loop`](`pw_sys::pw_main_loop`).
+    ///
+    /// The raw loop should not be manually destroyed or moved, as the new [`MainLoop`] takes ownership of it.
+    pub unsafe fn from_raw(ptr: NonNull<pw_sys::pw_main_loop>) -> Self {
+        Self {
+            inner: Rc::new(MainLoopInner::from_raw(ptr)),
+        }
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_main_loop {
+        self.inner.ptr.as_ptr()
     }
 
     pub fn downgrade(&self) -> WeakMainLoop {
         let weak = Rc::downgrade(&self.inner);
         WeakMainLoop { weak }
     }
-}
 
-impl AsLoop for MainLoop {
-    type Target = MainLoopInner;
+    pub fn loop_(&self) -> &LoopRef {
+        unsafe {
+            let pw_loop = pw_sys::pw_main_loop_get_loop(self.as_raw_ptr());
+            // FIXME: Make sure pw_loop is not null
+            &*(pw_loop.cast::<LoopRef>())
+        }
+    }
 
-    fn as_loop(&self) -> &Rc<Self::Target> {
-        &self.inner
+    pub fn run(&self) {
+        unsafe {
+            pw_sys::pw_main_loop_run(self.as_raw_ptr());
+        }
+    }
+
+    pub fn quit(&self) {
+        unsafe {
+            pw_sys::pw_main_loop_quit(self.as_raw_ptr());
+        }
     }
 }
+
+// Safety: The pw_loop is guaranteed to remain valid while any clone of the `MainLoop` is held,
+//         because we use an internal Rc to keep the pw_main_loop containing the pw_loop alive.
+unsafe impl IsLoopRc for MainLoop {}
 
 impl std::convert::AsRef<LoopRef> for MainLoop {
     fn as_ref(&self) -> &LoopRef {
-        self.deref()
-    }
-}
-
-impl Deref for MainLoop {
-    type Target = MainLoopInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+        self.loop_()
     }
 }
 
@@ -71,49 +93,13 @@ impl WeakMainLoop {
 }
 
 #[derive(Debug)]
-pub struct MainLoopInner {
+struct MainLoopInner {
     ptr: ptr::NonNull<pw_sys::pw_main_loop>,
 }
 
 impl MainLoopInner {
-    fn new(properties: Option<&spa::utils::dict::DictRef>) -> Result<Self, Error> {
-        unsafe {
-            let props = properties.map_or(ptr::null(), |props| props.as_raw()) as *mut _;
-            let l = pw_sys::pw_main_loop_new(props);
-            let ptr = ptr::NonNull::new(l).ok_or(Error::CreationFailed)?;
-
-            Ok(MainLoopInner { ptr })
-        }
-    }
-
-    fn as_ptr(&self) -> *mut pw_sys::pw_main_loop {
-        self.ptr.as_ptr()
-    }
-
-    pub fn run(&self) {
-        unsafe {
-            pw_sys::pw_main_loop_run(self.as_ptr());
-        }
-    }
-
-    pub fn quit(&self) {
-        unsafe {
-            pw_sys::pw_main_loop_quit(self.as_ptr());
-        }
-    }
-}
-
-impl std::convert::AsRef<LoopRef> for MainLoopInner {
-    fn as_ref(&self) -> &LoopRef {
-        self.deref()
-    }
-}
-
-impl std::ops::Deref for MainLoopInner {
-    type Target = LoopRef;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*(pw_sys::pw_main_loop_get_loop(self.ptr.as_ptr()) as *mut LoopRef) }
+    pub unsafe fn from_raw(ptr: NonNull<pw_sys::pw_main_loop>) -> Self {
+        Self { ptr }
     }
 }
 

@@ -30,8 +30,8 @@ impl LoopRef {
         &self.0
     }
 
-    pub fn as_ptr(&self) -> *mut pw_sys::pw_loop {
-        &self.0 as *const _ as *mut _
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_loop {
+        std::ptr::addr_of!(self.0).cast_mut()
     }
 
     /// Get the file descriptor backing this loop.
@@ -371,11 +371,13 @@ impl LoopRef {
     }
 }
 
-pub trait AsLoop {
-    type Target: AsRef<LoopRef> + 'static;
-
-    fn as_loop(&self) -> &Rc<Self::Target>;
-}
+/// Trait implemented by objects that implement a `pw_loop` and are reference counted in some way.
+///
+/// # Safety
+///
+/// The `LoopRef` returned by the implementation of `AsRef<LoopRef>` must remain valid as long as any clone
+/// of the trait implementor is still alive. \
+pub unsafe trait IsLoopRc: Clone + AsRef<LoopRef> + 'static {}
 
 #[derive(Clone, Debug)]
 pub struct Loop {
@@ -384,38 +386,54 @@ pub struct Loop {
 
 impl Loop {
     /// Create a new [`Loop`].
-    pub fn new() -> Result<Self, Error> {
-        LoopInner::new().map(|inner| Self {
-            inner: Rc::new(inner),
-        })
+    pub fn new(properties: Option<&spa::utils::dict::DictRef>) -> Result<Self, Error> {
+        // This is a potential "entry point" to the library, so we need to ensure it is initialized.
+        crate::init();
+
+        unsafe {
+            let props = properties
+                .map_or(ptr::null(), |props| props.as_raw())
+                .cast_mut();
+            let l = pw_sys::pw_loop_new(props);
+            let ptr = ptr::NonNull::new(l).ok_or(Error::CreationFailed)?;
+            Ok(Self::from_raw(ptr))
+        }
     }
 
-    // TODO: fn with_props
+    /// Create a new loop from a raw [`pw_loop`](`pw_sys::pw_loop`), taking ownership of it.
+    ///
+    /// # Safety
+    /// The provided pointer must point to a valid, well aligned [`pw_loop`](`pw_sys::pw_loop`).
+    ///
+    /// The raw loop should not be manually destroyed or moved, as the new [`Loop`] takes ownership of it.
+    pub unsafe fn from_raw(ptr: NonNull<pw_sys::pw_loop>) -> Self {
+        Self {
+            inner: Rc::new(LoopInner::from_raw(ptr)),
+        }
+    }
+
     pub fn downgrade(&self) -> WeakLoop {
         let weak = Rc::downgrade(&self.inner);
         WeakLoop { weak }
     }
 }
 
-impl AsLoop for Loop {
-    type Target = LoopInner;
+// Safety: The inner pw_loop is guaranteed to remain valid while any clone of the `Loop` is held,
+//         because we use an internal Rc to keep it alive.
+unsafe impl IsLoopRc for Loop {}
 
-    fn as_loop(&self) -> &Rc<Self::Target> {
-        &self.inner
+impl std::ops::Deref for Loop {
+    type Target = LoopRef;
+
+    fn deref(&self) -> &Self::Target {
+        let loop_ = self.inner.ptr.as_ptr();
+        unsafe { &*(loop_.cast::<LoopRef>()) }
     }
 }
 
 impl std::convert::AsRef<LoopRef> for Loop {
     fn as_ref(&self) -> &LoopRef {
         self.deref()
-    }
-}
-
-impl std::ops::Deref for Loop {
-    type Target = LoopInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
     }
 }
 
@@ -430,45 +448,13 @@ impl WeakLoop {
 }
 
 #[derive(Debug)]
-pub struct LoopInner {
+struct LoopInner {
     ptr: ptr::NonNull<pw_sys::pw_loop>,
 }
 
 impl LoopInner {
-    /// Create a new loop from a raw [`pw_loop`](`pw_sys::pw_loop`), taking ownership of it.
-    ///
-    /// # Safety
-    /// The provided pointer must point to a valid, well aligned [`pw_loop`](`pw_sys::pw_loop`).
-    ///
-    /// The raw loop should not be manually destroyed or moved, as the new [`LoopInner`] takes ownership of it.
     pub unsafe fn from_raw(ptr: NonNull<pw_sys::pw_loop>) -> Self {
-        LoopInner { ptr }
-    }
-
-    /// Create a new [`LoopInner`].
-    pub fn new() -> Result<Self, Error> {
-        // This is a potential "entry point" to the library, so we need to ensure it is initialized.
-        crate::init();
-
-        unsafe {
-            let l = pw_sys::pw_loop_new(std::ptr::null());
-            let ptr = ptr::NonNull::new(l).ok_or(Error::CreationFailed)?;
-            Ok(Self::from_raw(ptr))
-        }
-    }
-}
-
-impl std::convert::AsRef<LoopRef> for LoopInner {
-    fn as_ref(&self) -> &LoopRef {
-        self.deref()
-    }
-}
-
-impl std::ops::Deref for LoopInner {
-    type Target = LoopRef;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*(self.ptr.as_ptr() as *mut LoopRef) }
+        Self { ptr }
     }
 }
 

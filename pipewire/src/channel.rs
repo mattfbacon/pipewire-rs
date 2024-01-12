@@ -42,16 +42,16 @@
 //!     main_sender: mpsc::Sender<String>,
 //!     pw_receiver: pipewire::channel::Receiver<Terminate>
 //! ) {
-//!     let mainloop = MainLoop::new().expect("Failed to create main loop");
+//!     let mainloop = MainLoop::new(None).expect("Failed to create main loop");
 //!
 //!     // When we receive a `Terminate` message, quit the main loop.
-//!     let _receiver = pw_receiver.attach(&mainloop, {
+//!     let _receiver = pw_receiver.attach(mainloop.loop_(), {
 //!         let mainloop = mainloop.clone();
 //!         move |_| mainloop.quit()
 //!     });
 //!
 //!     // Every 100ms, send `"Hello"` to the main thread.
-//!     let timer = mainloop.add_timer(move |_| {
+//!     let timer = mainloop.loop_().add_timer(move |_| {
 //!         main_sender.send(String::from("Hello"));
 //!     });
 //!     timer.update_timer(

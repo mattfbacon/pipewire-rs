@@ -23,7 +23,7 @@
 //! use pipewire::{main_loop::MainLoop, context::Context};
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let mainloop = MainLoop::new()?;
+//!     let mainloop = MainLoop::new(None)?;
 //!     let context = Context::new(&mainloop)?;
 //!     let core = context.connect(None)?;
 //!     let registry = core.get_registry()?;
@@ -38,7 +38,7 @@
 //! use pipewire::{main_loop::MainLoop, context::Context};
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let mainloop = MainLoop::new()?;
+//!     let mainloop = MainLoop::new(None)?;
 //!     let context = Context::new(&mainloop)?;
 //!     let core = context.connect(None)?;
 //!     let registry = core.get_registry()?;
@@ -81,9 +81,9 @@
 //! use std::time::Duration;
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let mainloop = MainLoop::new()?;
+//!     let mainloop = MainLoop::new(None)?;
 //!
-//!     let timer = mainloop.add_timer(|_| println!("Hello"));
+//!     let timer = mainloop.loop_().add_timer(|_| println!("Hello"));
 //!     // Call the first time in half a second, and then in a one second interval.
 //!     timer.update_timer(Some(Duration::from_millis(500)), Some(Duration::from_secs(1))).into_result()?;
 //!

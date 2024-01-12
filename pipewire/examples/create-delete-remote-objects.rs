@@ -7,7 +7,7 @@ use pw::types::ObjectType;
 fn main() {
     // Initialize library and get the basic structures we need.
     pw::init();
-    let mainloop = pw::main_loop::MainLoop::new().expect("Failed to create Pipewire Mainloop");
+    let mainloop = pw::main_loop::MainLoop::new(None).expect("Failed to create Pipewire Mainloop");
     let context = pw::context::Context::new(&mainloop).expect("Failed to create Pipewire Context");
     let core = context
         .connect(None)

@@ -4,14 +4,13 @@
 use std::{
     ffi::{CStr, CString},
     mem::MaybeUninit,
-    ops::Deref,
     ptr,
     rc::{Rc, Weak},
 };
 
 use crate::{
     error::Error,
-    loop_::{AsLoop, LoopRef},
+    loop_::{IsLoopRc, LoopRef},
 };
 
 /// A wrapper around the pipewire threaded loop interface. ThreadLoops are a higher level
@@ -23,135 +22,29 @@ pub struct ThreadLoop {
 }
 
 impl ThreadLoop {
-    /// Initialize Pipewire and create a new `ThreadLoop` with the given `name`
+    /// Initialize Pipewire and create a new `ThreadLoop` with the given `name` and optional properties.
     ///
     /// # Safety
-    pub unsafe fn new(name: Option<&str>) -> Result<Self, Error> {
-        let c_string = match name {
-            Some(name) => CString::new(name),
-            None => CString::new(""),
-        }
-        .unwrap();
-        let c_str = c_string.as_c_str();
-        ThreadLoop::new_cstr(Some(c_str))
+    /// TODO
+    pub unsafe fn new(
+        name: Option<&str>,
+        properties: Option<&spa::utils::dict::DictRef>,
+    ) -> Result<Self, Error> {
+        let name = name.map(|name| CString::new(name).unwrap());
+
+        ThreadLoop::new_cstr(name.as_deref(), properties)
     }
 
     /// Initialize Pipewire and create a new `ThreadLoop` with the given `name` as Cstr
     ///
     /// # Safety
-    pub unsafe fn new_cstr(name: Option<&CStr>) -> Result<Self, Error> {
-        super::init();
-        let inner = ThreadLoopInner::new(name, None)?;
-        Ok(Self {
-            inner: Rc::new(inner),
-        })
-    }
-
-    /// Create a new ThreadLoop with the given `name` and `properties`.
-    ///
-    /// # Safety
-    pub unsafe fn with_properties(
-        name: Option<&str>,
-        properties: &spa::utils::dict::DictRef,
-    ) -> Result<Self, Error> {
-        let c_string = match name {
-            Some(name) => CString::new(name),
-            None => CString::new(""),
-        }
-        .unwrap();
-        let c_str = c_string.as_c_str();
-        ThreadLoop::with_properties_cstr(Some(c_str), properties)
-    }
-
-    /// Create a new ThreadLoop with the given `name` as CStr and `properties`.
-    ///
-    /// # Safety
-    pub unsafe fn with_properties_cstr(
-        name: Option<&CStr>,
-        properties: &spa::utils::dict::DictRef,
-    ) -> Result<Self, Error> {
-        let inner = ThreadLoopInner::new(name, Some(properties))?;
-        Ok(Self {
-            inner: Rc::new(inner),
-        })
-    }
-
-    pub fn downgrade(&self) -> WeakThreadLoop {
-        let weak = Rc::downgrade(&self.inner);
-        WeakThreadLoop { weak }
-    }
-}
-
-impl AsLoop for ThreadLoop {
-    type Target = ThreadLoopInner;
-
-    fn as_loop(&self) -> &Rc<Self::Target> {
-        &self.inner
-    }
-}
-
-impl std::convert::AsRef<LoopRef> for ThreadLoop {
-    fn as_ref(&self) -> &LoopRef {
-        self.deref()
-    }
-}
-
-impl Deref for ThreadLoop {
-    type Target = ThreadLoopInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-pub struct WeakThreadLoop {
-    weak: Weak<ThreadLoopInner>,
-}
-
-impl WeakThreadLoop {
-    pub fn upgrade(&self) -> Option<ThreadLoop> {
-        self.weak.upgrade().map(|inner| ThreadLoop { inner })
-    }
-}
-
-pub struct ThreadLoopLockGuard<'a> {
-    thread_loop: &'a ThreadLoopInner,
-}
-
-impl<'a> ThreadLoopLockGuard<'a> {
-    fn new(thread_loop: &'a ThreadLoopInner) -> Self {
-        unsafe {
-            pw_sys::pw_thread_loop_lock(thread_loop.as_ptr());
-        }
-        ThreadLoopLockGuard { thread_loop }
-    }
-
-    /// Unlock the loop
-    ///
-    /// Unlocking the loop will call `drop()`
-    pub fn unlock(self) {
-        drop(self);
-    }
-}
-
-impl<'a> Drop for ThreadLoopLockGuard<'a> {
-    fn drop(&mut self) {
-        unsafe {
-            pw_sys::pw_thread_loop_unlock(self.thread_loop.as_ptr());
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ThreadLoopInner {
-    ptr: ptr::NonNull<pw_sys::pw_thread_loop>,
-}
-
-impl ThreadLoopInner {
-    fn new(
+    /// TODO
+    pub unsafe fn new_cstr(
         name: Option<&CStr>,
         properties: Option<&spa::utils::dict::DictRef>,
     ) -> Result<Self, Error> {
+        super::init();
+
         unsafe {
             let props = properties.map_or(ptr::null(), |props| props.as_raw_ptr());
             let l = pw_sys::pw_thread_loop_new(
@@ -160,12 +53,26 @@ impl ThreadLoopInner {
             );
             let ptr = ptr::NonNull::new(l).ok_or(Error::CreationFailed)?;
 
-            Ok(ThreadLoopInner { ptr })
+            Ok(Self {
+                inner: Rc::new(ThreadLoopInner::from_raw(ptr)),
+            })
         }
     }
 
-    fn as_ptr(&self) -> *mut pw_sys::pw_thread_loop {
-        self.ptr.as_ptr()
+    pub fn downgrade(&self) -> WeakThreadLoop {
+        let weak = Rc::downgrade(&self.inner);
+        WeakThreadLoop { weak }
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_thread_loop {
+        self.inner.ptr.as_ptr()
+    }
+
+    pub fn loop_(&self) -> &LoopRef {
+        unsafe {
+            let thread_loop = pw_sys::pw_thread_loop_get_loop(self.as_raw_ptr());
+            &*(thread_loop.cast::<LoopRef>())
+        }
     }
 
     /// Lock the Loop
@@ -185,7 +92,7 @@ impl ThreadLoopInner {
     /// Start the ThreadLoop
     pub fn start(&self) {
         unsafe {
-            pw_sys::pw_thread_loop_start(self.as_ptr());
+            pw_sys::pw_thread_loop_start(self.as_raw_ptr());
         }
     }
 
@@ -194,14 +101,14 @@ impl ThreadLoopInner {
     /// Stopping the ThreadLoop must be called without the lock
     pub fn stop(&self) {
         unsafe {
-            pw_sys::pw_thread_loop_stop(self.as_ptr());
+            pw_sys::pw_thread_loop_stop(self.as_raw_ptr());
         }
     }
 
     /// Signal all threads waiting with [`wait()`](`Self::wait`)
     pub fn signal(&self, signal: bool) {
         unsafe {
-            pw_sys::pw_thread_loop_signal(self.as_ptr(), signal);
+            pw_sys::pw_thread_loop_signal(self.as_raw_ptr(), signal);
         }
     }
 
@@ -210,7 +117,7 @@ impl ThreadLoopInner {
     /// Release the lock and wait until some thread calls [`signal()`](`Self::signal`)
     pub fn wait(&self) {
         unsafe {
-            pw_sys::pw_thread_loop_wait(self.as_ptr());
+            pw_sys::pw_thread_loop_wait(self.as_raw_ptr());
         }
     }
 
@@ -222,7 +129,7 @@ impl ThreadLoopInner {
                 .as_secs()
                 .try_into()
                 .expect("Provided timeout does not fit in a i32");
-            pw_sys::pw_thread_loop_timed_wait(self.as_ptr(), wait_max_sec);
+            pw_sys::pw_thread_loop_timed_wait(self.as_raw_ptr(), wait_max_sec);
         }
     }
 
@@ -230,7 +137,7 @@ impl ThreadLoopInner {
     pub fn get_time(&self, timeout: i64) -> nix::sys::time::TimeSpec {
         unsafe {
             let mut abstime: MaybeUninit<pw_sys::timespec> = std::mem::MaybeUninit::uninit();
-            pw_sys::pw_thread_loop_get_time(self.as_ptr(), abstime.as_mut_ptr(), timeout);
+            pw_sys::pw_thread_loop_get_time(self.as_raw_ptr(), abstime.as_mut_ptr(), timeout);
             let abstime = abstime.assume_init();
             nix::sys::time::TimeSpec::new(abstime.tv_sec, abstime.tv_nsec)
         }
@@ -246,7 +153,7 @@ impl ThreadLoopInner {
                 tv_nsec: abstime.tv_nsec(),
             };
             pw_sys::pw_thread_loop_timed_wait_full(
-                self.as_ptr(),
+                self.as_raw_ptr(),
                 &mut abstime as *mut pw_sys::timespec,
             );
         }
@@ -255,29 +162,74 @@ impl ThreadLoopInner {
     /// Signal all threads executing [`signal()`](`Self::signal`) with `wait_for_accept`
     pub fn accept(&self) {
         unsafe {
-            pw_sys::pw_thread_loop_accept(self.as_ptr());
+            pw_sys::pw_thread_loop_accept(self.as_raw_ptr());
         }
     }
 
     /// Check if inside the thread
     pub fn in_thread(&self) {
         unsafe {
-            pw_sys::pw_thread_loop_in_thread(self.as_ptr());
+            pw_sys::pw_thread_loop_in_thread(self.as_raw_ptr());
         }
     }
 }
 
-impl std::convert::AsRef<LoopRef> for ThreadLoopInner {
+// Safety: The pw_loop is guaranteed to remain valid while any clone of the `ThreadLoop` is held,
+//         because we use an internal Rc to keep the pw_thread_loop containing the pw_loop alive.
+unsafe impl IsLoopRc for ThreadLoop {}
+
+impl std::convert::AsRef<LoopRef> for ThreadLoop {
     fn as_ref(&self) -> &LoopRef {
-        self.deref()
+        self.loop_()
     }
 }
 
-impl std::ops::Deref for ThreadLoopInner {
-    type Target = LoopRef;
+pub struct WeakThreadLoop {
+    weak: Weak<ThreadLoopInner>,
+}
 
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*(pw_sys::pw_thread_loop_get_loop(self.ptr.as_ptr()) as *mut LoopRef) }
+impl WeakThreadLoop {
+    pub fn upgrade(&self) -> Option<ThreadLoop> {
+        self.weak.upgrade().map(|inner| ThreadLoop { inner })
+    }
+}
+
+pub struct ThreadLoopLockGuard<'a> {
+    thread_loop: &'a ThreadLoop,
+}
+
+impl<'a> ThreadLoopLockGuard<'a> {
+    fn new(thread_loop: &'a ThreadLoop) -> Self {
+        unsafe {
+            pw_sys::pw_thread_loop_lock(thread_loop.as_raw_ptr());
+        }
+        ThreadLoopLockGuard { thread_loop }
+    }
+
+    /// Unlock the loop
+    ///
+    /// Unlocking the loop will call `drop()`
+    pub fn unlock(self) {
+        drop(self);
+    }
+}
+
+impl<'a> Drop for ThreadLoopLockGuard<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            pw_sys::pw_thread_loop_unlock(self.thread_loop.as_raw_ptr());
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ThreadLoopInner {
+    ptr: ptr::NonNull<pw_sys::pw_thread_loop>,
+}
+
+impl ThreadLoopInner {
+    pub unsafe fn from_raw(ptr: ptr::NonNull<pw_sys::pw_thread_loop>) -> Self {
+        Self { ptr }
     }
 }
 
