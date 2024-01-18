@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use std::{
+    ffi::{CStr, CString},
     mem::MaybeUninit,
     ops::Deref,
     ptr,
@@ -26,6 +27,19 @@ impl ThreadLoop {
     ///
     /// # Safety
     pub unsafe fn new(name: Option<&str>) -> Result<Self, Error> {
+        let c_string = match name {
+            Some(name) => CString::new(name),
+            None => CString::new(""),
+        }
+        .unwrap();
+        let c_str = c_string.as_c_str();
+        ThreadLoop::new_cstr(Some(c_str))
+    }
+
+    /// Initialize Pipewire and create a new `ThreadLoop` with the given `name` as Cstr
+    ///
+    /// # Safety
+    pub unsafe fn new_cstr(name: Option<&CStr>) -> Result<Self, Error> {
         super::init();
         let inner = ThreadLoopInner::new(name, None)?;
         Ok(Self {
@@ -34,8 +48,26 @@ impl ThreadLoop {
     }
 
     /// Create a new ThreadLoop with the given `name` and `properties`.
-    pub fn with_properties(
+    ///
+    /// # Safety
+    pub unsafe fn with_properties(
         name: Option<&str>,
+        properties: &spa::utils::dict::DictRef,
+    ) -> Result<Self, Error> {
+        let c_string = match name {
+            Some(name) => CString::new(name),
+            None => CString::new(""),
+        }
+        .unwrap();
+        let c_str = c_string.as_c_str();
+        ThreadLoop::with_properties_cstr(Some(c_str), properties)
+    }
+
+    /// Create a new ThreadLoop with the given `name` as CStr and `properties`.
+    ///
+    /// # Safety
+    pub unsafe fn with_properties_cstr(
+        name: Option<&CStr>,
         properties: &spa::utils::dict::DictRef,
     ) -> Result<Self, Error> {
         let inner = ThreadLoopInner::new(name, Some(properties))?;
@@ -117,7 +149,7 @@ pub struct ThreadLoopInner {
 
 impl ThreadLoopInner {
     fn new(
-        name: Option<&str>,
+        name: Option<&CStr>,
         properties: Option<&spa::utils::dict::DictRef>,
     ) -> Result<Self, Error> {
         unsafe {
