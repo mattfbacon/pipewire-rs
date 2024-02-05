@@ -3,6 +3,7 @@
 
 use bitflags::bitflags;
 use libc::c_void;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::{ffi::CStr, ptr};
 use std::{fmt, mem};
@@ -53,7 +54,7 @@ impl Factory {
 #[derive(Default)]
 struct ListenerLocalCallbacks {
     #[allow(clippy::type_complexity)]
-    info: Option<Box<dyn Fn(&FactoryInfo)>>,
+    info: Option<Box<dyn Fn(&FactoryInfoRef)>>,
 }
 
 pub struct FactoryListenerLocalBuilder<'a> {
@@ -61,36 +62,89 @@ pub struct FactoryListenerLocalBuilder<'a> {
     cbs: ListenerLocalCallbacks,
 }
 
+#[repr(transparent)]
+pub struct FactoryInfoRef(pw_sys::pw_factory_info);
+
+impl FactoryInfoRef {
+    pub fn as_raw(&self) -> &pw_sys::pw_factory_info {
+        &self.0
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_factory_info {
+        std::ptr::addr_of!(self.0).cast_mut()
+    }
+
+    pub fn id(&self) -> u32 {
+        self.0.id
+    }
+
+    pub fn type_(&self) -> ObjectType {
+        ObjectType::from_str(unsafe { CStr::from_ptr(self.0.type_).to_str().unwrap() })
+    }
+
+    pub fn version(&self) -> u32 {
+        self.0.version
+    }
+
+    pub fn change_mask(&self) -> FactoryChangeMask {
+        FactoryChangeMask::from_bits(self.0.change_mask).expect("invalid change_mask")
+    }
+
+    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
+        let props_ptr: *mut spa::utils::dict::DictRef = self.0.props.cast();
+        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
+    }
+}
+
+impl fmt::Debug for FactoryInfoRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FactoryInfoRef")
+            .field("id", &self.id())
+            .field("type", &self.type_())
+            .field("version", &self.version())
+            .field("change_mask", &self.change_mask())
+            .field("props", &self.props())
+            .finish()
+    }
+}
+
 pub struct FactoryInfo {
     ptr: ptr::NonNull<pw_sys::pw_factory_info>,
 }
 
 impl FactoryInfo {
-    fn new(ptr: ptr::NonNull<pw_sys::pw_factory_info>) -> Self {
+    pub fn new(ptr: ptr::NonNull<pw_sys::pw_factory_info>) -> Self {
         Self { ptr }
     }
 
-    pub fn id(&self) -> u32 {
-        unsafe { self.ptr.as_ref().id }
+    pub fn from_raw(raw: *mut pw_sys::pw_factory_info) -> Self {
+        Self {
+            ptr: ptr::NonNull::new(raw).expect("Provided pointer is null"),
+        }
     }
 
-    pub fn type_(&self) -> ObjectType {
-        unsafe { ObjectType::from_str(CStr::from_ptr(self.ptr.as_ref().type_).to_str().unwrap()) }
+    pub fn into_raw(self) -> *mut pw_sys::pw_factory_info {
+        std::mem::ManuallyDrop::new(self).ptr.as_ptr()
     }
+}
 
-    pub fn version(&self) -> u32 {
-        unsafe { self.ptr.as_ref().version }
+impl Drop for FactoryInfo {
+    fn drop(&mut self) {
+        unsafe { pw_sys::pw_factory_info_free(self.ptr.as_ptr()) }
     }
+}
 
-    pub fn change_mask(&self) -> FactoryChangeMask {
-        let mask = unsafe { self.ptr.as_ref().change_mask };
-        FactoryChangeMask::from_bits(mask).expect("invalid change_mask")
+impl std::ops::Deref for FactoryInfo {
+    type Target = FactoryInfoRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.cast::<FactoryInfoRef>().as_ref() }
     }
+}
 
-    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
-        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
-
-        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
+impl AsRef<FactoryInfoRef> for FactoryInfo {
+    fn as_ref(&self) -> &FactoryInfoRef {
+        self.deref()
     }
 }
 
@@ -134,7 +188,7 @@ impl<'a> FactoryListenerLocalBuilder<'a> {
     #[must_use]
     pub fn info<F>(mut self, info: F) -> Self
     where
-        F: Fn(&FactoryInfo) + 'static,
+        F: Fn(&FactoryInfoRef) + 'static,
     {
         self.cbs.info = Some(Box::new(info));
         self
@@ -147,9 +201,10 @@ impl<'a> FactoryListenerLocalBuilder<'a> {
             info: *const pw_sys::pw_factory_info,
         ) {
             let callbacks = (data as *mut ListenerLocalCallbacks).as_ref().unwrap();
-            let info = ptr::NonNull::new(info as *mut _).expect("info is NULL");
-            let info = FactoryInfo::new(info);
-            callbacks.info.as_ref().unwrap()(&info);
+            let info =
+                ptr::NonNull::new(info as *mut pw_sys::pw_factory_info).expect("info is NULL");
+            let info = info.cast::<FactoryInfoRef>().as_ref();
+            callbacks.info.as_ref().unwrap()(info);
         }
 
         let e = unsafe {

@@ -1,6 +1,7 @@
 use std::{
     ffi::{c_void, CStr},
     fmt, mem,
+    ops::Deref,
     pin::Pin,
     ptr,
 };
@@ -69,7 +70,7 @@ impl Drop for LinkListener {
 #[derive(Default)]
 struct ListenerLocalCallbacks {
     #[allow(clippy::type_complexity)]
-    info: Option<Box<dyn Fn(&LinkInfo)>>,
+    info: Option<Box<dyn Fn(&LinkInfoRef)>>,
 }
 
 pub struct LinkListenerLocalBuilder<'link> {
@@ -81,7 +82,7 @@ impl<'a> LinkListenerLocalBuilder<'a> {
     #[must_use]
     pub fn info<F>(mut self, info: F) -> Self
     where
-        F: Fn(&LinkInfo) + 'static,
+        F: Fn(&LinkInfoRef) + 'static,
     {
         self.cbs.info = Some(Box::new(info));
         self
@@ -94,8 +95,9 @@ impl<'a> LinkListenerLocalBuilder<'a> {
             info: *const pw_sys::pw_link_info,
         ) {
             let callbacks = (data as *mut ListenerLocalCallbacks).as_ref().unwrap();
-            let info = LinkInfo::new(ptr::NonNull::new(info as *mut _).expect("info is NULL"));
-            callbacks.info.as_ref().unwrap()(&info);
+            let info = ptr::NonNull::new(info as *mut pw_sys::pw_link_info).expect("info is NULL");
+            let info = info.cast::<LinkInfoRef>().as_ref();
+            callbacks.info.as_ref().unwrap()(info);
         }
 
         let e = unsafe {
@@ -136,40 +138,43 @@ impl<'a> LinkListenerLocalBuilder<'a> {
     }
 }
 
-pub struct LinkInfo {
-    ptr: ptr::NonNull<pw_sys::pw_link_info>,
-}
+#[repr(transparent)]
+pub struct LinkInfoRef(pw_sys::pw_link_info);
 
-impl LinkInfo {
-    fn new(ptr: ptr::NonNull<pw_sys::pw_link_info>) -> Self {
-        Self { ptr }
+impl LinkInfoRef {
+    pub fn as_raw(&self) -> &pw_sys::pw_link_info {
+        &self.0
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_link_info {
+        std::ptr::addr_of!(self.0).cast_mut()
     }
 
     pub fn id(&self) -> u32 {
-        unsafe { self.ptr.as_ref().id }
+        self.0.id
     }
 
     pub fn output_node_id(&self) -> u32 {
-        unsafe { self.ptr.as_ref().output_node_id }
+        self.0.output_node_id
     }
 
     pub fn output_port_id(&self) -> u32 {
-        unsafe { self.ptr.as_ref().output_port_id }
+        self.0.output_port_id
     }
 
     pub fn input_node_id(&self) -> u32 {
-        unsafe { self.ptr.as_ref().input_node_id }
+        self.0.input_node_id
     }
 
     pub fn input_port_id(&self) -> u32 {
-        unsafe { self.ptr.as_ref().input_port_id }
+        self.0.input_port_id
     }
 
     pub fn state(&self) -> LinkState {
-        let raw_state = unsafe { self.ptr.as_ref().state };
+        let raw_state = self.0.state;
         match raw_state {
             pw_sys::pw_link_state_PW_LINK_STATE_ERROR => {
-                let error = unsafe { CStr::from_ptr(self.ptr.as_ref().error).to_str().unwrap() };
+                let error = unsafe { CStr::from_ptr(self.0.error).to_str().unwrap() };
                 LinkState::Error(error)
             }
             pw_sys::pw_link_state_PW_LINK_STATE_UNLINKED => LinkState::Unlinked,
@@ -183,26 +188,77 @@ impl LinkInfo {
     }
 
     pub fn change_mask(&self) -> LinkChangeMask {
-        let mask = unsafe { self.ptr.as_ref().change_mask };
-        LinkChangeMask::from_bits_retain(mask)
+        LinkChangeMask::from_bits_retain(self.0.change_mask)
     }
 
     pub fn format(&self) -> Option<&spa::pod::Pod> {
-        unsafe {
-            let format = self.ptr.as_ref().format;
-
-            if format.is_null() {
-                None
-            } else {
-                Some(spa::pod::Pod::from_raw(format))
-            }
+        let format = self.0.format;
+        if format.is_null() {
+            None
+        } else {
+            Some(unsafe { spa::pod::Pod::from_raw(format) })
         }
     }
 
     pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
-        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
-
+        let props_ptr: *mut spa::utils::dict::DictRef = self.0.props.cast();
         ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
+    }
+}
+
+impl fmt::Debug for LinkInfoRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LinkInfoRef")
+            .field("id", &self.id())
+            .field("output_node_id", &self.output_node_id())
+            .field("output_port_id", &self.output_port_id())
+            .field("input_node_id", &self.input_node_id())
+            .field("input_port_id", &self.input_port_id())
+            .field("change-mask", &self.change_mask())
+            .field("state", &self.state())
+            .field("props", &self.props())
+            // TODO: .field("format", &self.format())
+            .finish()
+    }
+}
+
+pub struct LinkInfo {
+    ptr: ptr::NonNull<pw_sys::pw_link_info>,
+}
+
+impl LinkInfo {
+    pub fn new(ptr: ptr::NonNull<pw_sys::pw_link_info>) -> Self {
+        Self { ptr }
+    }
+
+    pub fn from_raw(raw: *mut pw_sys::pw_link_info) -> Self {
+        Self {
+            ptr: ptr::NonNull::new(raw).expect("Provided pointer is null"),
+        }
+    }
+
+    pub fn into_raw(self) -> *mut pw_sys::pw_link_info {
+        std::mem::ManuallyDrop::new(self).ptr.as_ptr()
+    }
+}
+
+impl Drop for LinkInfo {
+    fn drop(&mut self) {
+        unsafe { pw_sys::pw_link_info_free(self.ptr.as_ptr()) }
+    }
+}
+
+impl std::ops::Deref for LinkInfo {
+    type Target = LinkInfoRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.cast::<LinkInfoRef>().as_ref() }
+    }
+}
+
+impl AsRef<LinkInfoRef> for LinkInfo {
+    fn as_ref(&self) -> &LinkInfoRef {
+        self.deref()
     }
 }
 

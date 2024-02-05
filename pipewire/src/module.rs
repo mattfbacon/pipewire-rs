@@ -3,6 +3,7 @@
 
 use bitflags::bitflags;
 use libc::c_void;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::{ffi::CStr, ptr};
 use std::{fmt, mem};
@@ -53,7 +54,7 @@ impl Module {
 #[derive(Default)]
 struct ListenerLocalCallbacks {
     #[allow(clippy::type_complexity)]
-    info: Option<Box<dyn Fn(&ModuleInfo)>>,
+    info: Option<Box<dyn Fn(&ModuleInfoRef)>>,
 }
 
 pub struct ModuleListenerLocalBuilder<'a> {
@@ -61,47 +62,98 @@ pub struct ModuleListenerLocalBuilder<'a> {
     cbs: ListenerLocalCallbacks,
 }
 
+#[repr(transparent)]
+pub struct ModuleInfoRef(pw_sys::pw_module_info);
+
+impl ModuleInfoRef {
+    pub fn as_raw(&self) -> &pw_sys::pw_module_info {
+        &self.0
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_module_info {
+        std::ptr::addr_of!(self.0).cast_mut()
+    }
+
+    pub fn id(&self) -> u32 {
+        self.0.id
+    }
+
+    pub fn name(&self) -> &str {
+        unsafe { CStr::from_ptr(self.0.name).to_str().unwrap() }
+    }
+
+    pub fn filename(&self) -> &str {
+        unsafe { CStr::from_ptr(self.0.name).to_str().unwrap() }
+    }
+
+    pub fn args(&self) -> Option<&str> {
+        let args = self.0.args;
+        if args.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(args).to_str().unwrap() })
+        }
+    }
+
+    pub fn change_mask(&self) -> ModuleChangeMask {
+        ModuleChangeMask::from_bits(self.0.change_mask).expect("invalid change_mask")
+    }
+
+    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
+        let props_ptr: *mut spa::utils::dict::DictRef = self.0.props.cast();
+        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
+    }
+}
+
+impl fmt::Debug for ModuleInfoRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ModuleInfoRef")
+            .field("id", &self.id())
+            .field("filename", &self.filename())
+            .field("args", &self.args())
+            .field("change_mask", &self.change_mask())
+            .field("props", &self.props())
+            .finish()
+    }
+}
+
 pub struct ModuleInfo {
     ptr: ptr::NonNull<pw_sys::pw_module_info>,
 }
 
 impl ModuleInfo {
-    fn new(ptr: ptr::NonNull<pw_sys::pw_module_info>) -> Self {
+    pub fn new(ptr: ptr::NonNull<pw_sys::pw_module_info>) -> Self {
         Self { ptr }
     }
 
-    pub fn id(&self) -> u32 {
-        unsafe { self.ptr.as_ref().id }
-    }
-
-    pub fn name(&self) -> &str {
-        unsafe { CStr::from_ptr(self.ptr.as_ref().name).to_str().unwrap() }
-    }
-
-    pub fn filename(&self) -> &str {
-        unsafe { CStr::from_ptr(self.ptr.as_ref().filename).to_str().unwrap() }
-    }
-
-    pub fn args(&self) -> Option<&str> {
-        unsafe {
-            let args = self.ptr.as_ref().args;
-            if args.is_null() {
-                None
-            } else {
-                Some(CStr::from_ptr(args).to_str().unwrap())
-            }
+    pub fn from_raw(raw: *mut pw_sys::pw_module_info) -> Self {
+        Self {
+            ptr: ptr::NonNull::new(raw).expect("Provided pointer is null"),
         }
     }
 
-    pub fn change_mask(&self) -> ModuleChangeMask {
-        let mask = unsafe { self.ptr.as_ref().change_mask };
-        ModuleChangeMask::from_bits(mask).expect("invalid change_mask")
+    pub fn into_raw(self) -> *mut pw_sys::pw_module_info {
+        std::mem::ManuallyDrop::new(self).ptr.as_ptr()
     }
+}
 
-    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
-        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
+impl Drop for ModuleInfo {
+    fn drop(&mut self) {
+        unsafe { pw_sys::pw_module_info_free(self.ptr.as_ptr()) }
+    }
+}
 
-        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
+impl std::ops::Deref for ModuleInfo {
+    type Target = ModuleInfoRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.cast::<ModuleInfoRef>().as_ref() }
+    }
+}
+
+impl AsRef<ModuleInfoRef> for ModuleInfo {
+    fn as_ref(&self) -> &ModuleInfoRef {
+        self.deref()
     }
 }
 
@@ -145,7 +197,7 @@ impl<'a> ModuleListenerLocalBuilder<'a> {
     #[must_use]
     pub fn info<F>(mut self, info: F) -> Self
     where
-        F: Fn(&ModuleInfo) + 'static,
+        F: Fn(&ModuleInfoRef) + 'static,
     {
         self.cbs.info = Some(Box::new(info));
         self
@@ -158,9 +210,10 @@ impl<'a> ModuleListenerLocalBuilder<'a> {
             info: *const pw_sys::pw_module_info,
         ) {
             let callbacks = (data as *mut ListenerLocalCallbacks).as_ref().unwrap();
-            let info = ptr::NonNull::new(info as *mut _).expect("info is NULL");
-            let info = ModuleInfo::new(info);
-            callbacks.info.as_ref().unwrap()(&info);
+            let info =
+                ptr::NonNull::new(info as *mut pw_sys::pw_module_info).expect("info is NULL");
+            let info = info.cast::<ModuleInfoRef>().as_ref();
+            callbacks.info.as_ref().unwrap()(info);
         }
 
         let e = unsafe {

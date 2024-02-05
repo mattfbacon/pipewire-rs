@@ -3,6 +3,7 @@
 
 use bitflags::bitflags;
 use libc::c_void;
+use std::ops::Deref;
 use std::{fmt, mem};
 use std::{pin::Pin, ptr};
 
@@ -98,7 +99,7 @@ impl ProxyT for Port {
 #[derive(Default)]
 struct ListenerLocalCallbacks {
     #[allow(clippy::type_complexity)]
-    info: Option<Box<dyn Fn(&PortInfo)>>,
+    info: Option<Box<dyn Fn(&PortInfoRef)>>,
     #[allow(clippy::type_complexity)]
     param: Option<Box<dyn Fn(i32, spa::param::ParamType, u32, u32, Option<&Pod>)>>,
 }
@@ -108,50 +109,97 @@ pub struct PortListenerLocalBuilder<'a> {
     cbs: ListenerLocalCallbacks,
 }
 
-pub struct PortInfo {
-    ptr: ptr::NonNull<pw_sys::pw_port_info>,
-}
+#[repr(transparent)]
+pub struct PortInfoRef(pw_sys::pw_port_info);
 
-impl PortInfo {
-    fn new(ptr: ptr::NonNull<pw_sys::pw_port_info>) -> Self {
-        Self { ptr }
+impl PortInfoRef {
+    pub fn as_raw(&self) -> &pw_sys::pw_port_info {
+        &self.0
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_port_info {
+        std::ptr::addr_of!(self.0).cast_mut()
     }
 
     pub fn id(&self) -> u32 {
-        unsafe { self.ptr.as_ref().id }
+        self.0.id
     }
 
     pub fn direction(&self) -> Direction {
-        let direction = unsafe { self.ptr.as_ref().direction };
-
-        Direction::from_raw(direction)
+        Direction::from_raw(self.0.direction)
     }
 
     pub fn change_mask(&self) -> PortChangeMask {
-        let mask = unsafe { self.ptr.as_ref().change_mask };
-        PortChangeMask::from_bits_retain(mask)
+        PortChangeMask::from_bits_retain(self.0.change_mask)
     }
 
     pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
-        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
-
+        let props_ptr: *mut spa::utils::dict::DictRef = self.0.props.cast();
         ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
     }
 
     /// Get the param infos for the port.
     pub fn params(&self) -> &[spa::param::ParamInfo] {
-        unsafe {
-            let params = self.ptr.as_ref().params;
-
-            if params.is_null() {
-                &[]
-            } else {
-                std::slice::from_raw_parts(
-                    params as *const _,
-                    self.ptr.as_ref().n_params.try_into().unwrap(),
-                )
+        let params = self.0.params;
+        if params.is_null() {
+            &[]
+        } else {
+            unsafe {
+                std::slice::from_raw_parts(params as *const _, self.0.n_params.try_into().unwrap())
             }
         }
+    }
+}
+
+impl fmt::Debug for PortInfoRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PortInfoRef")
+            .field("id", &self.id())
+            .field("direction", &self.direction())
+            .field("change-mask", &self.change_mask())
+            .field("props", &self.props())
+            .field("params", &self.params())
+            .finish()
+    }
+}
+
+pub struct PortInfo {
+    ptr: ptr::NonNull<pw_sys::pw_port_info>,
+}
+
+impl PortInfo {
+    pub fn new(ptr: ptr::NonNull<pw_sys::pw_port_info>) -> Self {
+        Self { ptr }
+    }
+
+    pub fn from_raw(raw: *mut pw_sys::pw_port_info) -> Self {
+        Self {
+            ptr: ptr::NonNull::new(raw).expect("Provided pointer is null"),
+        }
+    }
+
+    pub fn into_raw(self) -> *mut pw_sys::pw_port_info {
+        std::mem::ManuallyDrop::new(self).ptr.as_ptr()
+    }
+}
+
+impl Drop for PortInfo {
+    fn drop(&mut self) {
+        unsafe { pw_sys::pw_port_info_free(self.ptr.as_ptr()) }
+    }
+}
+
+impl std::ops::Deref for PortInfo {
+    type Target = PortInfoRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.cast::<PortInfoRef>().as_ref() }
+    }
+}
+
+impl AsRef<PortInfoRef> for PortInfo {
+    fn as_ref(&self) -> &PortInfoRef {
+        self.deref()
     }
 }
 
@@ -196,7 +244,7 @@ impl<'a> PortListenerLocalBuilder<'a> {
     #[must_use]
     pub fn info<F>(mut self, info: F) -> Self
     where
-        F: Fn(&PortInfo) + 'static,
+        F: Fn(&PortInfoRef) + 'static,
     {
         self.cbs.info = Some(Box::new(info));
         self
@@ -218,9 +266,9 @@ impl<'a> PortListenerLocalBuilder<'a> {
             info: *const pw_sys::pw_port_info,
         ) {
             let callbacks = (data as *mut ListenerLocalCallbacks).as_ref().unwrap();
-            let info = ptr::NonNull::new(info as *mut _).expect("info is NULL");
-            let info = PortInfo::new(info);
-            callbacks.info.as_ref().unwrap()(&info);
+            let info = ptr::NonNull::new(info as *mut pw_sys::pw_port_info).expect("info is NULL");
+            let info = info.cast::<PortInfoRef>().as_ref();
+            callbacks.info.as_ref().unwrap()(info);
         }
 
         unsafe extern "C" fn port_events_param(

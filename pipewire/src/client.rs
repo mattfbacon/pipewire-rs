@@ -3,6 +3,7 @@
 
 use bitflags::bitflags;
 use libc::c_void;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::{ffi::CString, ptr};
 use std::{fmt, mem};
@@ -104,7 +105,7 @@ impl Client {
 #[derive(Default)]
 struct ListenerLocalCallbacks {
     #[allow(clippy::type_complexity)]
-    info: Option<Box<dyn Fn(&ClientInfo)>>,
+    info: Option<Box<dyn Fn(&ClientInfoRef)>>,
     #[allow(clippy::type_complexity)]
     permissions: Option<Box<dyn Fn(u32, &[Permission])>>,
 }
@@ -114,28 +115,79 @@ pub struct ClientListenerLocalBuilder<'a> {
     cbs: ListenerLocalCallbacks,
 }
 
+#[repr(transparent)]
+pub struct ClientInfoRef(pw_sys::pw_client_info);
+
+impl ClientInfoRef {
+    pub fn as_raw(&self) -> &pw_sys::pw_client_info {
+        &self.0
+    }
+
+    pub fn as_raw_ptr(&self) -> *mut pw_sys::pw_client_info {
+        std::ptr::addr_of!(self.0).cast_mut()
+    }
+
+    pub fn id(&self) -> u32 {
+        self.0.id
+    }
+
+    pub fn change_mask(&self) -> ClientChangeMask {
+        ClientChangeMask::from_bits(self.0.change_mask).expect("invalid change_mask")
+    }
+
+    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
+        let props_ptr: *mut spa::utils::dict::DictRef = self.0.props.cast();
+        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
+    }
+}
+
+impl fmt::Debug for ClientInfoRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ClientInfoRef")
+            .field("id", &self.id())
+            .field("change-mask", &self.change_mask())
+            .field("props", &self.props())
+            .finish()
+    }
+}
+
 pub struct ClientInfo {
     ptr: ptr::NonNull<pw_sys::pw_client_info>,
 }
 
 impl ClientInfo {
-    fn new(ptr: ptr::NonNull<pw_sys::pw_client_info>) -> Self {
+    pub fn new(ptr: ptr::NonNull<pw_sys::pw_client_info>) -> Self {
         Self { ptr }
     }
 
-    pub fn id(&self) -> u32 {
-        unsafe { self.ptr.as_ref().id }
+    pub fn from_raw(raw: *mut pw_sys::pw_client_info) -> Self {
+        Self {
+            ptr: ptr::NonNull::new(raw).expect("Provided pointer is null"),
+        }
     }
 
-    pub fn change_mask(&self) -> ClientChangeMask {
-        let mask = unsafe { self.ptr.as_ref().change_mask };
-        ClientChangeMask::from_bits(mask).expect("invalid change_mask")
+    pub fn into_raw(self) -> *mut pw_sys::pw_client_info {
+        std::mem::ManuallyDrop::new(self).ptr.as_ptr()
     }
+}
 
-    pub fn props(&self) -> Option<&spa::utils::dict::DictRef> {
-        let props_ptr: *mut spa::utils::dict::DictRef = unsafe { self.ptr.as_ref().props.cast() };
+impl Drop for ClientInfo {
+    fn drop(&mut self) {
+        unsafe { pw_sys::pw_client_info_free(self.ptr.as_ptr()) }
+    }
+}
 
-        ptr::NonNull::new(props_ptr).map(|ptr| unsafe { ptr.as_ref() })
+impl std::ops::Deref for ClientInfo {
+    type Target = ClientInfoRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.cast::<ClientInfoRef>().as_ref() }
+    }
+}
+
+impl AsRef<ClientInfoRef> for ClientInfo {
+    fn as_ref(&self) -> &ClientInfoRef {
+        self.deref()
     }
 }
 
@@ -177,7 +229,7 @@ impl<'a> ClientListenerLocalBuilder<'a> {
     #[must_use]
     pub fn info<F>(mut self, info: F) -> Self
     where
-        F: Fn(&ClientInfo) + 'static,
+        F: Fn(&ClientInfoRef) + 'static,
     {
         self.cbs.info = Some(Box::new(info));
         self
@@ -198,9 +250,10 @@ impl<'a> ClientListenerLocalBuilder<'a> {
             info: *const pw_sys::pw_client_info,
         ) {
             let callbacks = (data as *mut ListenerLocalCallbacks).as_ref().unwrap();
-            let info = ptr::NonNull::new(info as *mut _).expect("info is NULL");
-            let info = ClientInfo::new(info);
-            callbacks.info.as_ref().unwrap()(&info);
+            let info =
+                ptr::NonNull::new(info as *mut pw_sys::pw_client_info).expect("info is NULL");
+            let info = info.cast::<ClientInfoRef>().as_ref();
+            callbacks.info.as_ref().unwrap()(info);
         }
 
         unsafe extern "C" fn client_events_permissions(
