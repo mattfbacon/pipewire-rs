@@ -1,7 +1,7 @@
 [package]
 name = "pipewire"
-version = "0.7.2"
-authors = ["Guillaume Desmottes <guillaume.desmottes@collabora.com>"]
+version = "0.8.0"
+authors = ["Tom Wagner <tom.a.wagner@protonmail.com", "Guillaume Desmottes <guillaume.desmottes@collabora.com>"]
 rust-version = "1.65"
 edition = "2021"
 categories = ["api-bindings", "multimedia"]
@@ -14,9 +14,9 @@ documentation = "https://pipewire.pages.freedesktop.org/pipewire-rs/pipewire/"
 keywords = ["pipewire", "multimedia", "audio", "video"]
 
 [dependencies]
-pw_sys = { package = "pipewire-sys", version = "0.7", path = "../pipewire-sys" }
-spa_sys = { package = "libspa-sys", version = "0.7", path = "../libspa-sys" }
-spa = { package = "libspa", version = "0.7", path = "../libspa" }
+pw_sys = { package = "pipewire-sys", version = "0.8", path = "../pipewire-sys" }
+spa_sys = { package = "libspa-sys", version = "0.8", path = "../libspa-sys" }
+spa = { package = "libspa", version = "0.8", path = "../libspa" }
 anyhow = "1"
 thiserror = "1"
 libc = "0.2"
