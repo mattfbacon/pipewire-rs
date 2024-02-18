@@ -10,6 +10,7 @@ use crate::{
     properties::{Properties, PropertiesRef},
 };
 use bitflags::bitflags;
+use spa::utils::dict::DictRef;
 use spa::utils::result::SpaResult;
 use std::{
     ffi::{self, CStr, CString},
@@ -303,6 +304,13 @@ impl StreamRef {
             let props = pw_sys::pw_stream_get_properties(self.as_raw_ptr());
             let props = ptr::NonNull::new(props.cast_mut()).expect("stream properties is NULL");
             props.cast().as_ref()
+        }
+    }
+
+    #[inline]
+    pub fn update_properties(&self, dict: &DictRef) {
+        unsafe {
+            pw_sys::pw_stream_update_properties(self.as_raw_ptr(), dict.as_raw_ptr());
         }
     }
 
